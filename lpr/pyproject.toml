@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "parkspot-lpr"
+version = "0.1.0"
+description = "Egyptian LPR + Siemens LOGO! gate control for the ParkSpot parking system"
+requires-python = ">=3.10"
+dependencies = [
+    "opencv-python>=4.8",
+    "numpy>=1.26",
+    "PyYAML>=6.0",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "pymodbus>=3.6,<4",
+]
+
+[project.optional-dependencies]
+detection = ["ultralytics>=8.2"]
+ocr-gpu = ["onnxruntime-gpu>=1.17"]
+train = ["torch>=2.2", "torchvision>=0.17", "albumentations>=1.4", "Pillow>=10.0"]
+
+[project.scripts]
+lpr-cli = "lpr.cli:main"
+
+[tool.setuptools]
+packages = ["lpr", "lpr.capture", "lpr.detection", "lpr.gate", "lpr.ocr"]

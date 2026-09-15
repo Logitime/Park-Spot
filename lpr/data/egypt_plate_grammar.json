@@ -1,0 +1,22 @@
+{
+  "note": "Egyptian license plate grammar used by lpr validation (ocr/egypt.py).",
+  "canonical_form": "letters + digits, no spaces (e.g. 'سصد1234')",
+  "classes": ["private", "transport", "taxi"],
+  "rules": {
+    "letters": { "min": 1, "max": 3, "alphabet": "28 standard Arabic letters" },
+    "digits": { "min": 1, "max": 4, "forms": ["Western 0-9", "Arabic-Indic ٠-٩ on older plates (mapped)"] },
+    "order": "letters first, then digits (left to right on the plate)"
+  },
+  "examples": [
+    { "plate": "س صد 1234", "letters": 3, "digits": 4, "class": "private" },
+    { "plate": "د ب ب 567", "letters": 3, "digits": 3, "class": "private" },
+    { "plate": "أج رة 456", "letters": 2, "digits": 3, "class": "taxi" },
+    { "plate": "نقل 3 1", "letters": 2, "digits": 2, "class": "transport" }
+  ],
+  "invalid": [
+    "digits before letters",
+    "more than 3 letters",
+    "more than 4 digits",
+    "empty / non-plate text"
+  ]
+}

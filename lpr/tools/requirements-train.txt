@@ -1,0 +1,10 @@
+# Training-time dependencies (runtime deps live in ../requirements.txt)
+# For GPU training on Windows install the CUDA PyTorch wheels first, e.g.:
+#   pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+torch>=2.2
+torchvision>=0.17
+ultralytics>=8.2
+Pillow>=10.0
+numpy>=1.26
+albumentations>=1.4
+onnxruntime-gpu>=1.17 ; sys_platform == "win32"

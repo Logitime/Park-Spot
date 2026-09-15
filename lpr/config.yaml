@@ -1,0 +1,60 @@
+# ParkSpot LPR + Siemens LOGO! gate service
+# All values are overridable by LPR_* / PARKSPOT_* / LOGO_* env vars.
+
+capture:
+  source: rtsp            # rtsp | usb
+  url: ""                 # e.g. rtsp://admin:pass@192.168.1.64:554/Streaming/Channels/101
+  device: 0               # USB device index when source=usb
+  fps: 15
+  width: 1920
+  height: 1080
+  roi: [0, 0, 1, 1]       # x1, y1, x2, y2 in normalized coords — narrow to the lane mouth
+  replay: ""              # optional offline image/video path for bench tests
+  replayLoop: false
+
+detection:
+  model: ""               # e.g. models/egypt_plate_yolov8n.pt (see models/README.md)
+  conf: 0.35
+  device: "0"             # ultralytics device: "0" (CUDA GPU) | "cpu" | "mps"
+  imgsz: 640
+  batch: 1
+  maxDet: 4
+
+ocr:
+  demo: true              # true = deterministic demo plate, no models needed
+  model: ""               # e.g. models/egypt_char_cnn.onnx (see tools/train_ocr.py)
+  confidence: 0.6
+  preprocess: threshold
+  padding: 4
+  demoPlate: "سصد1234"    # used only when demo: true
+
+match:
+  apiUrl: ""              # ParkSpot web API, e.g. http://192.168.1.20:4000 (PARKSPOT_API_URL)
+  token: ""               # ADMIN bearer JWT from POST /api/auth/login (PARKSPOT_TOKEN)
+  minConfidence: 0.55
+  autoCheckin: true       # call reservation check-in when gate opens for a CONFIRMED booking
+  timeoutSec: 5.0
+
+tracking:
+  maxWindowSec: 30        # how long to keep reading plates before denying
+  stableFrames: 2         # same plate votes required before matching
+  iouThreshold: 0.45
+
+gate:
+  enabled: true
+  host: "192.168.0.10"    # LOGO! IP (LOGO_IP)
+  port: 502
+  unit: 1
+  timeout: 2.0
+  reconnectEvery: 2.0
+  openSeconds: 20         # barrier auto-close safety timeout
+  postCarGrace: 1.5       # wait after loop1 clears before rearming
+  denyBlockSeconds: 8.0   # hold barrier closed after a deny
+  registers:
+    loop1:          { kind: discrete, address: 0 }   # LOGO! I1
+    loop2:          { kind: discrete, address: 1 }   # LOGO! I2
+    gateOpenSensor: { kind: discrete, address: 2 }   # LOGO! I3 (limit switch)
+    open:           { kind: coil,    address: 0 }    # LOGO! Q1 (barrier drive)
+
+app:
+  loopHz: 10

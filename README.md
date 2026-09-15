@@ -45,6 +45,10 @@ Key routes:
   demand-based auto-surge preview / apply / rollback (`/api/admin/pricing/auto`)
 - `/admin/refunds` — payments, full/partial admin refunds, and the operator
   audit trail (`/api/admin/audit`)
+- `lpr/` — edge **License Plate Recognition + automatic gate** service
+  (Python): YOLO detection + Egyptian-plate OCR → match against bookings →
+  Siemens **LOGO! 8** gate control over Modbus TCP with inductive-loop safety.
+  See [`lpr/README.md`](lpr/README.md) and [`lpr/docs/`](lpr/docs/).
 - `POST /api/cron/maintenance` — no-show & release automation sweep
   (auto-cancels unpaid PENDING reservations, releases no-show CONFIRMED spots
   with an automatic refund, auto-completes finished ACTIVE sessions) + sends

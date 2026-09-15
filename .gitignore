@@ -48,6 +48,16 @@ skills-lock.json
 # vercel
 .vercel
 
+# python / lpr service
+__pycache__/
+*.pyc
+/lpr/.venv/
+/lpr/data/synthetic*/
+/lpr/models/*.onnx
+/lpr/models/*.pt
+/lpr/runs/
+/lpr/weights/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -1,0 +1,10 @@
+# LPR + gate service — runtime dependencies (Windows server)
+opencv-python>=4.8.1
+numpy>=1.26
+PyYAML>=6.0
+requests>=2.31
+python-dotenv>=1.0
+pymodbus>=3.6,<4
+ultralytics>=8.2            # YOLO detection (pulls torch; see README for CUDA)
+onnxruntime-gpu>=1.17 ; sys_platform == "win32"
+onnxruntime>=1.17 ; sys_platform != "win32"

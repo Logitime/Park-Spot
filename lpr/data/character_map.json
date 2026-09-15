@@ -1,0 +1,50 @@
+{
+  "comment": "Egyptian plate character set. Class indices MUST match the OCR classifier head: 0..27 = Arabic letters (28), 28..37 = Western digits (10). Arabic-Indic digits ٠-٩ are mapped to Western at inference. Index order matches lpr/ocr/charset.CLASS_CHARS.",
+  "classes": 38,
+  "letters": {
+    "ا": { "index": 0,  "latin": "A" },
+    "ب": { "index": 1,  "latin": "B" },
+    "ت": { "index": 2,  "latin": "T" },
+    "ث": { "index": 3,  "latin": "TH" },
+    "ج": { "index": 4,  "latin": "G" },
+    "ح": { "index": 5,  "latin": "H" },
+    "خ": { "index": 6,  "latin": "KH" },
+    "د": { "index": 7,  "latin": "D" },
+    "ذ": { "index": 8,  "latin": "DH" },
+    "ر": { "index": 9,  "latin": "R" },
+    "ز": { "index": 10, "latin": "Z" },
+    "س": { "index": 11, "latin": "S" },
+    "ش": { "index": 12, "latin": "SH" },
+    "ص": { "index": 13, "latin": "S" },
+    "ض": { "index": 14, "latin": "DH" },
+    "ط": { "index": 15, "latin": "T" },
+    "ظ": { "index": 16, "latin": "DH" },
+    "ع": { "index": 17, "latin": "A" },
+    "غ": { "index": 18, "latin": "GH" },
+    "ف": { "index": 19, "latin": "F" },
+    "ق": { "index": 20, "latin": "Q" },
+    "ك": { "index": 21, "latin": "K" },
+    "ل": { "index": 22, "latin": "L" },
+    "م": { "index": 23, "latin": "M" },
+    "ن": { "index": 24, "latin": "N" },
+    "ه": { "index": 25, "latin": "H" },
+    "و": { "index": 26, "latin": "W" },
+    "ي": { "index": 27, "latin": "Y" }
+  },
+  "digits": {
+    "0": { "index": 28 },
+    "1": { "index": 29 },
+    "2": { "index": 30 },
+    "3": { "index": 31 },
+    "4": { "index": 32 },
+    "5": { "index": 33 },
+    "6": { "index": 34 },
+    "7": { "index": 35 },
+    "8": { "index": 36 },
+    "9": { "index": 37 }
+  },
+  "indic_to_west": {
+    "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",
+    "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9"
+  }
+}

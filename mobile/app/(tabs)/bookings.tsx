@@ -104,6 +104,7 @@ export default function BookingsScreen() {
                   </Text>
                   <Text style={styles.meta}>
                     {fmtTime(item.startTime)} → {fmtTime(item.endTime)}
+                    {item.vehicle?.plateNumber ? ` · ${item.vehicle.plateNumber}` : ''}
                   </Text>
                 </View>
                 <View style={styles.right}>

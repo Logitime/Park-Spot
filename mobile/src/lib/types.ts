@@ -46,6 +46,7 @@ export interface Spot {
       name: string;
       address: string;
       baseHourlyRate: number;
+      evChargingRate?: number;
     };
   };
 }

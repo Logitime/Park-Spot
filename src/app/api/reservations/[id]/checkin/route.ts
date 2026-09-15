@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth";
 import { notifyUser } from "@/lib/notify";
+import { logAudit } from "@/lib/settings";
 
 const EARLY_GRACE_MS = 60 * 60 * 1000; // allow entry up to 1h before start
 
@@ -77,6 +78,13 @@ export async function POST(
     type: "RESERVATION_STARTED",
     content: `Checked in at ${reservation.spot.zone.name} #${reservation.spot.number} (${new Date().toLocaleString()}).`,
     relatedId: id,
+  });
+
+  await logAudit({
+    userId: session.userId,
+    userRole: session.role,
+    action: "GATE_CHECKIN",
+    details: `reservation=${id} spot=${reservation.spot.number} @ ${reservation.spot.zone.name}`,
   });
 
   return NextResponse.json({ ok: true });

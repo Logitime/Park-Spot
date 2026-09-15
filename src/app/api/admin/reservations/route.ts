@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
         { id: { contains: q } },
         { user: { name: { contains: q } } },
         { user: { email: { contains: q } } },
+        { vehicle: { plateNumber: { contains: q } } },
       ],
     }),
   };
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest) {
       user: { select: { id: true, name: true, email: true } },
       spot: { include: { zone: { include: { lot: { select: { id: true, name: true } } } } } },
       payments: { select: { status: true, amount: true } },
+      vehicle: { select: { plateNumber: true, type: true } },
     },
   });
 
@@ -50,6 +52,7 @@ export async function GET(request: NextRequest) {
       totalPrice: r.totalPrice,
       createdAt: r.createdAt,
       user: r.user,
+      vehicle: r.vehicle,
       spot: {
         number: r.spot.number,
         zone: r.spot.zone.name,

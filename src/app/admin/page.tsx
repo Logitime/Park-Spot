@@ -5,6 +5,7 @@ import Link from "next/link";
 import { apiGet } from "@/lib/api";
 import { formatCurrency, formatDate, statusBadge } from "@/lib/utils";
 import AdminTabs from "@/components/AdminTabs";
+import PolicyPanel from "@/components/PolicyPanel";
 import type { AdminAnalytics, DailyTrendPoint } from "@/lib/types";
 
 const ascent = (name: string) => {
@@ -300,6 +301,8 @@ export default function AdminPage() {
           </div>
         ))}
       </div>
+
+      <PolicyPanel />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-5">
         <div

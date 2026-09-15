@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import AdminTabs from "@/components/AdminTabs";
-import type { PricingConfig, PricingZone, PricingRule } from "@/lib/types";
+import type {
+  PricingConfig,
+  PricingZone,
+  PricingRule,
+  PricingAutoPreview,
+} from "@/lib/types";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -27,20 +32,63 @@ export default function PricingAdminPage() {
   const [endHour, setEndHour] = useState("19");
   const [multiplier, setMultiplier] = useState("1.2");
 
-  const reload = useCallback(() => {
-    apiGet<PricingConfig>("/api/admin/pricing")
-      .then((d) => {
-        setData(d);
-        if (!selectedZone && d.zones.length) setSelectedZone(d.zones[0].id);
-      })
-      .catch((e) =>
-        setError(e instanceof Error ? e.message : "Failed to load pricing")
-      )
-      .finally(() => setLoading(false));
-  }, [selectedZone]);
+  const [autoData, setAutoData] = useState<PricingAutoPreview | null>(null);
+  const [autoBusy, setAutoBusy] = useState(false);
+
+  const loadAuto = useCallback(() => {
+    apiGet<PricingAutoPreview>("/api/admin/pricing/auto")
+      .then(setAutoData)
+      .catch(() => setAutoData(null));
+  }, []);
 
   useEffect(() => {
-    reload();
+    loadAuto();
+  }, [loadAuto]);
+
+  const applyAuto = async () => {
+    setAutoBusy(true);
+    setMessage(null);
+    try {
+      await apiPost("/api/admin/pricing/auto", {});
+      setMessage("Auto-surge applied for the current hour. Roll back anytime.");
+      reload();
+      loadAuto();
+    } catch (err) {
+      setMessage(err instanceof Error ? `Error: ${err.message}` : "Apply failed");
+    } finally {
+      setAutoBusy(false);
+    }
+  };
+
+  const rollbackAuto = async () => {
+    setAutoBusy(true);
+    setMessage(null);
+    try {
+      await apiDelete("/api/admin/pricing/auto");
+      setMessage("Auto-surge rules rolled back.");
+      reload();
+      loadAuto();
+    } catch (err) {
+      setMessage(err instanceof Error ? `Error: ${err.message}` : "Rollback failed");
+    } finally {
+      setAutoBusy(false);
+    }
+  };
+
+  const reload = async () => {
+    try {
+      const d = await apiGet<PricingConfig>("/api/admin/pricing");
+      setData(d);
+      if (!selectedZone && d.zones.length) setSelectedZone(d.zones[0].id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load pricing");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -113,6 +161,72 @@ export default function PricingAdminPage() {
       </div>
 
       <AdminTabs />
+
+      {autoData && (
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-slate-800">Auto-surge</h2>
+              <p className="mt-1 text-xs text-slate-400">
+                Occupancy-based surge multiplier for the current hour. Applies
+                when a lot&apos;s occupancy reaches{" "}
+                {autoData.policy.highOccupancyThreshold}% (range{" "}
+                {autoData.policy.minMultiplier.toFixed(1)}x–{autoData.policy.maxMultiplier.toFixed(1)}x).
+                Auto-surge rules are always labeled &quot;auto-surge&quot; and can be
+                rolled back.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={applyAuto}
+                disabled={autoBusy}
+                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                Apply now
+              </button>
+              <button
+                onClick={rollbackAuto}
+                disabled={autoBusy}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Roll back
+              </button>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {autoData.lots.map((lot) => (
+              <div key={lot.id} className="rounded-xl border border-slate-100 p-4">
+                <div className="flex items-baseline justify-between">
+                  <p className="font-medium text-slate-700">{lot.name}</p>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      lot.occupancyPct >= autoData.policy.highOccupancyThreshold
+                        ? "bg-rose-100 text-rose-700"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {lot.occupancyPct}% full
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-400">
+                  {lot.occupied} occupied · {lot.reserved} reserved · {lot.free} free
+                </p>
+                <p className="mt-2 text-sm">
+                  <span className="text-slate-500">Recommended: </span>
+                  <span className="font-semibold text-slate-800">
+                    {Math.max(...lot.zones.map((z) => z.recommendedMultiplier)).toFixed(2)}x
+                  </span>
+                  {lot.zones.some((z) => z.surgeActive) && (
+                    <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                      active
+                    </span>
+                  )}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {message && (
         <div className="mb-4 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-800">

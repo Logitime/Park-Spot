@@ -75,3 +75,22 @@ export async function apiDelete<T>(path: string): Promise<T> {
     method: "DELETE",
   });
 }
+
+export async function payForReservation(
+  reservationId: string
+): Promise<{ mode: "checkout" | "demo" }> {
+  try {
+    const res = await apiPost<{ sessionUrl: string }>(
+      "/api/payments/checkout",
+      { reservationId }
+    );
+    if (res.sessionUrl) {
+      window.location.href = res.sessionUrl;
+      return { mode: "checkout" };
+    }
+  } catch {
+    // Stripe unconfigured (503) or checkout failure → fall back to demo pay.
+  }
+  await apiPost("/api/payments", { reservationId });
+  return { mode: "demo" };
+}

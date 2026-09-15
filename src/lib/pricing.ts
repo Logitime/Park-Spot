@@ -25,7 +25,8 @@ export function calculateDynamicPrice(
   pricePerHour: number,
   start: Date,
   end: Date,
-  rules: PricingRule[]
+  rules: PricingRule[],
+  addOnHourly = 0,
 ): number {
   if (end <= start) return 0;
 
@@ -39,7 +40,7 @@ export function calculateDynamicPrice(
     const segmentHours =
       (segmentEnd.getTime() - current.getTime()) / (1000 * 60 * 60);
 
-    const hourly = pricePerHour * zone.priceMultiplier;
+    const hourly = pricePerHour * zone.priceMultiplier + addOnHourly;
     const multiplier = ruleMultiplierFor(rules, current);
     total += hourly * multiplier * segmentHours;
     current.setHours(current.getHours() + 1, 0, 0, 0);

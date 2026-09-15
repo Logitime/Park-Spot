@@ -1,8 +1,9 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Linking from 'expo-linking';
 import QRCode from 'react-native-qrcode-svg';
-import { api } from '@/src/lib/api';
+import { api, ApiError } from '@/src/lib/api';
 import {
   C,
   SIZE_LABEL,
@@ -47,7 +48,22 @@ export default function BookingScreen() {
     setError(null);
     try {
       if (kind === 'pay') {
-        await api.post('/api/payments', { reservationId: reservation.id });
+        try {
+          const res = await api.post<{ sessionUrl: string }>(
+            '/api/payments/checkout',
+            { reservationId: reservation.id }
+          );
+          if (res.sessionUrl) {
+            await Linking.openURL(res.sessionUrl);
+          }
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 503) {
+            // Stripe not configured on the server → demo payment simulation.
+            await api.post('/api/payments', { reservationId: reservation.id });
+          } else {
+            throw e;
+          }
+        }
       } else {
         await api.put(`/api/reservations/${reservation.id}`, {});
       }

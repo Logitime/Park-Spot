@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     include: {
       zone: {
         include: {
-          lot: { select: { id: true, name: true, address: true, baseHourlyRate: true } },
+          lot: { select: { id: true, name: true, address: true, baseHourlyRate: true, evChargingRate: true } },
         },
       },
     },

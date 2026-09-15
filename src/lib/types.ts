@@ -41,7 +41,7 @@ export interface Spot {
     name: string;
     floor: number;
     priceMultiplier: number;
-    lot: { id: string; name: string; address: string; baseHourlyRate: number };
+    lot: { id: string; name: string; address: string; baseHourlyRate: number; evChargingRate?: number };
   };
 }
 
@@ -87,6 +87,112 @@ export interface Reservation {
   };
   vehicle: { plateNumber: string; type: string } | null;
   payments: { status: string; amount: number; provider: string }[];
+}
+
+export interface PolicySettings {
+  pendingCancelMinutes: number;
+  noShowGraceMinutes: number;
+  autoCompleteMinutes: number;
+  freeCancelMinutes: number;
+  partialRefundEnabled: boolean;
+  surgeMinMultiplier: number;
+  surgeMaxMultiplier: number;
+  surgeHighOccupancy: number;
+}
+
+export interface OpsReservationRow {
+  id: string;
+  status: string;
+  startTime: string;
+  endTime: string;
+  totalPrice: number;
+  qrCode: string | null;
+  user: { id: string; name: string; email: string };
+  vehicle: { plateNumber: string; type: string } | null;
+  spot: {
+    number: number;
+    zone: { name: string; floor: number; lot: { id: string; name: string } };
+  };
+  paid?: boolean;
+}
+
+export interface OpsBoard {
+  onSiteCount: number;
+  onSite: OpsReservationRow[];
+  expectedCount: number;
+  expected: OpsReservationRow[];
+  breachCount: number;
+  breach: OpsReservationRow[];
+  lots: {
+    id: string;
+    name: string;
+    total: number;
+    occupied: number;
+    reserved: number;
+    free: number;
+    occupancyPct: number;
+  }[];
+  feed: {
+    id: string;
+    action: string;
+    details: string;
+    userRole: string | null;
+    createdAt: string;
+  }[];
+  timestamp: string;
+}
+
+export interface RefundPaymentRow {
+  id: string;
+  amount: number;
+  refundedAmount: number;
+  status: string;
+  provider: string;
+  providerRef: string | null;
+  refundedAt: string | null;
+  createdAt: string;
+  reservation: {
+    id: string;
+    status: string;
+    qrCode: string | null;
+    user: { name: string; email: string } | null;
+    vehicle: { plateNumber: string } | null;
+    spot: { number: number; zone: { name: string; lot: { name: string } } };
+  };
+}
+
+export interface AuditEntry {
+  id: string;
+  userId: string | null;
+  userRole: string | null;
+  action: string;
+  details: string;
+  createdAt: string;
+}
+
+export interface PricingAutoPreview {
+  policy: {
+    highOccupancyThreshold: number;
+    minMultiplier: number;
+    maxMultiplier: number;
+  };
+  generatedAt: string;
+  lots: {
+    id: string;
+    name: string;
+    occupancyPct: number;
+    total: number;
+    occupied: number;
+    reserved: number;
+    free: number;
+    zones: {
+      zoneId: string;
+      zoneName: string;
+      recommendedMultiplier: number;
+      currentMultiplier: number;
+      surgeActive: boolean;
+    }[];
+  }[];
 }
 
 export interface AdminSummary {

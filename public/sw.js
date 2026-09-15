@@ -1,4 +1,4 @@
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL_CACHE = `parkspot-shell-${VERSION}`;
 const STATIC_CACHE = `parkspot-static-${VERSION}`;
 const API_CACHE = `parkspot-api-${VERSION}`;
@@ -6,7 +6,13 @@ const API_CACHE = `parkspot-api-${VERSION}`;
 const OFFLINE_MSG =
   "You're offline. Reconnect to the network and try again.";
 
-const APP_SHELL = ["/", "/login", "/register"];
+const APP_SHELL = [
+  "/",
+  "/login",
+  "/register",
+  "/admin/gate",
+  "/admin/operations",
+];
 
 async function installCrawl(cache) {
   const assetPaths = new Set();

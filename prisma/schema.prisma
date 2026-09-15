@@ -34,28 +34,30 @@ model Vehicle {
 }
 
 model ParkingLot {
-  id             String     @id @default(cuid())
-  name           String
-  address        String
-  latitude       Float
-  longitude      Float
-  totalSpots     Int
-  baseHourlyRate Float      @default(2.0)
-  operatorId     String?
-  operator       User?      @relation("LotOperator", fields: [operatorId], references: [id])
-  zones          Zone[]
-  createdAt      DateTime   @default(now())
+  id              String   @id @default(cuid())
+  name            String
+  address         String
+  latitude        Float
+  longitude       Float
+  totalSpots      Int
+  baseHourlyRate  Float    @default(2.0)
+  evChargingRate  Float    @default(0.5) // per-hour add-on for EV spots
+  operatorId      String?
+  operator        User?    @relation("LotOperator", fields: [operatorId], references: [id])
+  zones           Zone[]
+  createdAt       DateTime @default(now())
 }
 
 model Zone {
-  id              String        @id @default(cuid())
+  id              String          @id @default(cuid())
   lotId           String
-  lot             ParkingLot    @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  lot             ParkingLot      @relation(fields: [lotId], references: [id], onDelete: Cascade)
   name            String
   floor           Int
-  priceMultiplier Float         @default(1.0)
+  priceMultiplier Float           @default(1.0)
   spots           Spot[]
   pricingRules    PricingRule[]
+  pricingEvents   PricingEvent[]
 }
 
 model Spot {
@@ -95,10 +97,12 @@ model Payment {
   id            String      @id @default(cuid())
   reservationId String
   reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
-  amount        Float
-  status        String      @default("PENDING") // PENDING | PAID | REFUNDED | FAILED
+  amount        Float       // amount charged
+  status        String      @default("PENDING") // PENDING | PAID | REFUNDED | PARTIALLY_REFUNDED | FAILED | CANCELLED
   provider      String      @default("STRIPE")
   providerRef   String?
+  refundedAmount Float      @default(0)
+  refundedAt    DateTime?
   createdAt     DateTime    @default(now())
 }
 
@@ -130,7 +134,35 @@ model PushToken {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   token     String   @unique
-  platform  String   @default("unknown") // ios | android | web
+  platform  String   @default("unknown")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  userRole  String?
+  action    String
+  details   String
+  createdAt DateTime @default(now())
+}
+
+model PricingEvent {
+  id               String   @id @default(cuid())
+  zoneId           String
+  zone             Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  action           String // APPLY | ROLLBACK
+  multiplierBefore Float
+  multiplierAfter  Float
+  reason           String
+  createdById      String?
+  createdByRole    String?
+  createdAt        DateTime @default(now())
 }

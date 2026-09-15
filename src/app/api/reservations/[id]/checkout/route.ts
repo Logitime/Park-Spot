@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth";
 import { notifyUser } from "@/lib/notify";
+import { logAudit } from "@/lib/settings";
 
 export async function POST(
   _request: NextRequest,
@@ -56,6 +57,13 @@ export async function POST(
     type: "RESERVATION_COMPLETED",
     content: `Checked out of ${reservation.spot.zone.name} #${reservation.spot.number}. Thanks for parking with us!`,
     relatedId: id,
+  });
+
+  await logAudit({
+    userId: session.userId,
+    userRole: session.role,
+    action: "GATE_CHECKOUT",
+    details: `reservation=${id} spot=${reservation.spot.number} @ ${reservation.spot.zone.name}`,
   });
 
   return NextResponse.json({ ok: true });

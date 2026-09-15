@@ -17,6 +17,26 @@ type AdminReservation = {
   user: { id: string; name: string; email: string };
   spot: { number: number; zone: string; lot: string };
   paid: boolean;
+  vehicle?: { plateNumber: string; type: string } | null;
+};
+
+type PlateLookup = {
+  plate: string;
+  vehicles: {
+    plateNumber: string;
+    type: string;
+    reservations: {
+      id: string;
+      qrCode: string | null;
+      status: string;
+      startTime: string;
+      endTime: string;
+      totalPrice: number;
+      user: { id: string; name: string; email: string };
+      spot: { number: number; zone: string; lot: string };
+      paid: boolean;
+    }[];
+  }[];
 };
 
 export default function GateAdminPage() {
@@ -24,6 +44,9 @@ export default function GateAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [q, setQ] = useState("");
+  const [plate, setPlate] = useState("");
+  const [plateLookup, setPlateLookup] = useState<PlateLookup | null>(null);
+  const [plateBusy, setPlateBusy] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -67,11 +90,30 @@ export default function GateAdminPage() {
       r.user.email.toLowerCase().includes(needle) ||
       (r.qrCode ?? "").toLowerCase().includes(needle) ||
       r.id.toLowerCase().includes(needle) ||
-      r.spot.lot.toLowerCase().includes(needle)
+      r.spot.lot.toLowerCase().includes(needle) ||
+      (r.vehicle?.plateNumber ?? "").toLowerCase().includes(needle)
     );
   };
 
   const filtered = (rows ?? []).filter(matches);
+
+  const lookupPlate = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (plate.trim().length < 2) return;
+    setPlateBusy(true);
+    setMessage(null);
+    try {
+      const data = await apiGet<PlateLookup>(
+        `/api/admin/gate/lookup?plate=${encodeURIComponent(plate)}`
+      );
+      setPlateLookup(data);
+      setQ(data.plate);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Plate lookup failed");
+    } finally {
+      setPlateBusy(false);
+    }
+  };
 
   return (
     <main className="mx-auto max-w-7xl flex-1 px-4 py-8 sm:px-6">
@@ -95,7 +137,7 @@ export default function GateAdminPage() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search name, email, QR code, lot…"
+          placeholder="Search name, email, QR code, plate, lot…"
           className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
         <select
@@ -114,12 +156,100 @@ export default function GateAdminPage() {
           onClick={() => {
             setQ("");
             setStatusFilter("");
+            setPlateLookup(null);
+            setPlate("");
           }}
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
         >
           Clear
         </button>
       </div>
+
+      <form
+        onSubmit={lookupPlate}
+        className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+      >
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            License plate lookup
+          </span>
+          <input
+            value={plate}
+            onChange={(e) => setPlate(e.target.value)}
+            placeholder="e.g. ABC 123"
+            className="mt-1 w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase tracking-wider"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={plateBusy || plate.trim().length < 2}
+          className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-50"
+        >
+          {plateBusy ? "Looking up…" : "Look up"}
+        </button>
+        <p className="text-xs text-slate-400">
+          Finds active/upcoming reservations linked to that plate number.
+        </p>
+      </form>
+
+      {plateLookup && (
+        <div className="mb-4 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
+          <p className="text-sm font-medium text-slate-800">
+            Plate <span className="font-mono font-bold">{plateLookup.plate}</span> —{" "}
+            {plateLookup.vehicles.length === 0
+              ? "no active or upcoming reservations"
+              : `${plateLookup.vehicles.reduce((n, v) => n + v.reservations.length, 0)} active/upcoming reservation(s)`}
+          </p>
+          {plateLookup.vehicles.map((v) =>
+            v.reservations.map((r) => (
+              <div
+                key={r.id}
+                className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-white p-3"
+              >
+                <div>
+                  <p className="font-medium text-slate-800">
+                    {r.spot.lot} · #{r.spot.number} · {r.spot.zone}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {r.user.name} · {formatDate(r.startTime)} → {formatDate(r.endTime)} ·{" "}
+                    {formatCurrency(r.totalPrice)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge(r.status)}`}
+                  >
+                    {r.status}
+                  </span>
+                  {r.paid ? (
+                    <span className="text-sm font-medium text-emerald-600">Paid</span>
+                  ) : (
+                    <span className="text-sm text-rose-500">Unpaid</span>
+                  )}
+                  {r.status === "CONFIRMED" && (
+                    <button
+                      onClick={() => act(r.id, "checkin")}
+                      disabled={busyId === r.id}
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      Check in
+                    </button>
+                  )}
+                  {r.status === "ACTIVE" && (
+                    <button
+                      onClick={() => act(r.id, "checkout")}
+                      disabled={busyId === r.id}
+                      className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:opacity-50"
+                    >
+                      Check out
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">

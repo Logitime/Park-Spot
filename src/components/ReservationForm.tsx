@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { apiPost } from "@/lib/api";
+import { apiPost, payForReservation } from "@/lib/api";
 import { calculatePrice, formatCurrency, hoursBetween } from "@/lib/utils";
 import type { Reservation, Spot, User } from "@/lib/types";
 
@@ -25,6 +25,7 @@ export default function ReservationForm({
 }: ReservationFormProps) {
   const [start, setStart] = useState(localDateTime(60));
   const [end, setEnd] = useState(localDateTime(3 * 60));
+  const [plate, setPlate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Reservation | null>(null);
@@ -35,9 +36,13 @@ export default function ReservationForm({
     if (isNaN(startD.getTime()) || isNaN(endD.getTime())) return null;
     const hours = hoursBetween(startD, endD);
     if (hours <= 0) return null;
+    const addOn = spot.evCharging ? (spot.zone.lot.evChargingRate ?? 0) : 0;
     return {
       hours,
-      amount: calculatePrice(hours, spot.pricePerHour, spot.zone.priceMultiplier),
+      addOn,
+      amount:
+        calculatePrice(hours, spot.pricePerHour, spot.zone.priceMultiplier) +
+        addOn * hours,
     };
   }, [start, end, spot]);
 
@@ -57,16 +62,20 @@ export default function ReservationForm({
           spotId: spot.id,
           startTime: startD.toISOString(),
           endTime: endD.toISOString(),
+          plateNumber: plate.trim() || null,
         }
       );
 
-      const paid = await apiPost<{ reservation: Reservation }>(
-        "/api/payments",
-        { reservationId: created.reservation.id }
-      );
+      const { mode } = await payForReservation(created.reservation.id);
 
-      setResult(paid.reservation);
-      onDone(paid.reservation);
+      if (mode === "demo") {
+        const paid = await apiPost<{ reservation: Reservation }>(
+          "/api/payments",
+          { reservationId: created.reservation.id }
+        );
+        setResult(paid.reservation);
+        onDone(paid.reservation);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Reservation failed");
     } finally {
@@ -176,6 +185,23 @@ export default function ReservationForm({
         />
       </div>
 
+      <div>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          License plate <span className="normal-case text-slate-400">(optional)</span>
+        </label>
+        <input
+          type="text"
+          value={plate}
+          onChange={(e) => setPlate(e.target.value)}
+          placeholder="e.g. ABC 123"
+          autoComplete="off"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase tracking-wider focus:border-teal-500 focus:outline-none"
+        />
+        <p className="mt-1 text-[11px] text-slate-400">
+          Plate-linked reservations can be looked up at the entry gate.
+        </p>
+      </div>
+
       {price && (
         <div className="rounded-xl bg-slate-50 p-4 text-sm">
           <div className="flex justify-between text-slate-600">
@@ -189,6 +215,12 @@ export default function ReservationForm({
             <span>Duration</span>
             <span>{price.hours.toFixed(2)} hrs</span>
           </div>
+          {price.addOn > 0 && (
+            <div className="mt-1 flex justify-between text-emerald-700">
+              <span>EV charging add-on</span>
+              <span>+{formatCurrency(price.addOn)}/hr</span>
+            </div>
+          )}
           <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 font-semibold text-slate-800">
             <span>Total</span>
             <span>{formatCurrency(price.amount)}</span>
@@ -210,7 +242,7 @@ export default function ReservationForm({
         {submitting ? "Reserving…" : "Reserve & pay"}
       </button>
       <p className="text-center text-[11px] text-slate-400">
-        Demo checkout — no real charge is made.
+        Secure checkout via Stripe when configured; otherwise a demo payment is simulated.
       </p>
     </form>
   );

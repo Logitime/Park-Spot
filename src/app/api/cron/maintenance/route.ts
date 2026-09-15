@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runMaintenanceSweep } from "@/lib/maintenance-sweep";
+import { maybeSendDailyReport } from "@/lib/report";
 
 export const runtime = "nodejs";
 
@@ -10,5 +11,6 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await runMaintenanceSweep();
-  return NextResponse.json({ ok: true, ...result });
+  const report = await maybeSendDailyReport();
+  return NextResponse.json({ ok: true, ...result, report });
 }

@@ -9,6 +9,12 @@ import { calculateDynamicPrice } from "@/lib/pricing";
 const createSchema = z.object({
   spotId: z.string().min(1),
   vehicleId: z.string().optional().nullable(),
+  plateNumber: z
+    .string()
+    .trim()
+    .optional()
+    .nullable()
+    .refine((v) => !v || v.length >= 2, "Plate number is too short"),
   startTime: z.string().datetime({ offset: true }),
   endTime: z.string().datetime({ offset: true }),
 });
@@ -61,7 +67,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { spotId, vehicleId, startTime, endTime } = parsed.data;
+  const { spotId, vehicleId, plateNumber, startTime, endTime } = parsed.data;
   const start = new Date(startTime);
   const end = new Date(endTime);
 
@@ -114,6 +120,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  let resolvedVehicleId = vehicleId ?? null;
+  if (!resolvedVehicleId && plateNumber) {
+    const normalized = plateNumber.toUpperCase().replace(/\s+/g, "");
+    const existing = await prisma.vehicle.findFirst({
+      where: { plateNumber: normalized, userId: session.userId },
+    });
+    const vehicle = existing
+      ? existing
+      : await prisma.vehicle.create({
+          data: { plateNumber: normalized, userId: session.userId },
+        });
+    resolvedVehicleId = vehicle.id;
+  }
+
   const overlapping = await prisma.reservation.findFirst({
     where: {
       spotId,
@@ -134,7 +154,8 @@ export async function POST(request: NextRequest) {
     spot.pricePerHour,
     start,
     end,
-    spot.zone.pricingRules
+    spot.zone.pricingRules,
+    spot.evCharging ? spot.zone.lot.evChargingRate : 0,
   );
 
   const reservation = await prisma.$transaction(async (tx) => {
@@ -142,7 +163,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId: session.userId,
         spotId: spot.id,
-        vehicleId: vehicleId ?? null,
+        vehicleId: resolvedVehicleId ?? null,
         startTime: start,
         endTime: end,
         totalPrice,

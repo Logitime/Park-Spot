@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth";
 import { notifyUser } from "@/lib/notify";
-import { refundStripePayment } from "@/lib/stripe";
+import { getPolicy, logAudit } from "@/lib/settings";
+import { computeRefundAmount, refundInTx } from "@/lib/refund";
 
 export async function PUT(
   _request: NextRequest,
@@ -27,6 +28,11 @@ export async function PUT(
     );
   }
 
+  const policy = await getPolicy();
+  const now = new Date();
+  const startMs = reservation.startTime.getTime();
+  const freeCancelMs = policy.freeCancelMinutes * 60_000;
+
   const cancelled = await prisma.$transaction(async (tx) => {
     const updated = await tx.reservation.update({
       where: { id },
@@ -45,34 +51,47 @@ export async function PUT(
           where: { id: payment.id },
           data: { status: "CANCELLED" },
         });
-      } else if (payment.status === "PAID") {
-        const providerRef =
-          payment.provider === "STRIPE" && payment.providerRef
-            ? payment.providerRef
-            : null;
+        continue;
+      }
+      if (payment.status !== "PAID") continue;
 
-        const refundRef =
-          providerRef
-            ? await refundStripePayment(providerRef, payment.amount)
-            : null;
-
-        await tx.payment.update({
-          where: { id: payment.id },
-          data: {
-            status: refundRef ? "REFUNDED" : payment.status,
-            ...(refundRef ? { providerRef: refundRef } : {}),
-          },
+      if (now.getTime() <= startMs + freeCancelMs) {
+        await refundInTx(tx, {
+          payment: { ...payment, refundedAmount: 0 },
+          amount: payment.amount,
+          reason: "cancellation in free window",
         });
+      } else if (policy.partialRefundEnabled) {
+        const refund = computeRefundAmount(
+          payment.amount,
+          reservation.startTime,
+          reservation.endTime,
+          now
+        );
+        if (refund > 0) {
+          await refundInTx(tx, {
+            payment: { ...payment, refundedAmount: 0 },
+            amount: refund,
+            reason: "prorated early-exit refund",
+          });
+        }
       }
     }
 
     return updated;
   });
 
+  await logAudit({
+    userId: session.userId,
+    userRole: session.role,
+    action: "RESERVATION_CANCELLED",
+    details: `reservation=${id} totalPrice=${reservation.totalPrice}`,
+  });
+
   await notifyUser({
     userId: session.userId,
     type: "RESERVATION_CANCELLED",
-    content: "Your parking reservation has been cancelled.",
+    content: "Your parking reservation has been cancelled. Any refund will be processed.",
     relatedId: id,
   });
 

@@ -4,6 +4,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { api, ApiError } from '@/src/lib/api';
@@ -34,6 +35,7 @@ export default function BookScreen() {
   const [error, setError] = useState<string | null>(null);
   const [startIdx, setStartIdx] = useState(1);
   const [duration, setDuration] = useState(2);
+  const [plate, setPlate] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
@@ -56,6 +58,11 @@ export default function BookScreen() {
     return round2(duration * spot.pricePerHour);
   }, [spot, duration]);
 
+  const evAddOn = useMemo(() => {
+    if (!spot?.evCharging) return 0;
+    return duration * (spot.zone.lot.evChargingRate ?? 0);
+  }, [spot, duration]);
+
   const reserve = async () => {
     if (!spot) return;
     setSubmitting(true);
@@ -69,6 +76,7 @@ export default function BookScreen() {
           spotId: spot.id,
           startTime: start.toISOString(),
           endTime: end.toISOString(),
+          plateNumber: plate.trim() || null,
         }
       );
       router.replace({
@@ -138,9 +146,28 @@ export default function BookScreen() {
         </View>
       </ScreenSection>
 
+      <ScreenSection title="License plate (optional)">
+        <TextInput
+          value={plate}
+          onChangeText={setPlate}
+          placeholder="e.g. ABC 123"
+          autoCapitalize="characters"
+          autoCorrect={false}
+          style={styles.input}
+        />
+        <Text style={styles.hint}>
+          Plate-linked bookings can be looked up at the entry gate.
+        </Text>
+      </ScreenSection>
+
       <Card style={styles.estimate}>
         <Text style={styles.estimateLabel}>Estimated total</Text>
         <Text style={styles.estimateValue}>{fmtMoney(estimate)}</Text>
+        {evAddOn > 0 && (
+          <Text style={styles.evNote}>
+            +{fmtMoney(evAddOn)} EV charging add-on
+          </Text>
+        )}
         <Text style={styles.estimateNote}>
           Final price is computed by the booking engine (incl. zone multiplier).
         </Text>
@@ -209,4 +236,19 @@ const styles = StyleSheet.create({
     color: C.teal,
   },
   estimateNote: { marginTop: 6, fontSize: 12, color: C.muted },
+  evNote: { marginTop: 2, fontSize: 13, fontWeight: '700', color: C.teal },
+  input: {
+    marginTop: 4,
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: C.text,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  hint: { marginTop: 6, fontSize: 12, color: C.muted },
 });

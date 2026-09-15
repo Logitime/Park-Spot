@@ -1,6 +1,7 @@
-import { BOOKING_POLICY } from "./booking-policy";
+import { getPolicy } from "./settings";
 import { prisma } from "./prisma";
 import { notifyUser } from "./notify";
+import { refundInTx } from "./refund";
 
 let lastRunAt = 0;
 const SWEEP_COOLDOWN_MS = 60_000;
@@ -12,7 +13,7 @@ async function cancelAndNotify(
     spotId: string;
     status: string;
     spot: { id: string };
-    payments: { id: string; status: string }[];
+    payments: { id: string; amount: number; status: string; provider: string; providerRef: string | null; refundedAmount: number }[];
   },
   reason: "UNPAID_EXPIRED" | "NO_SHOW" | "AUTO_CANCELLED",
 ) {
@@ -40,6 +41,12 @@ async function cancelAndNotify(
           where: { id: payment.id },
           data: { status: "CANCELLED" },
         });
+      } else if (payment.status === "PAID" && reason === "NO_SHOW") {
+        await refundInTx(tx, {
+          payment,
+          amount: payment.amount,
+          reason: "no-show release",
+        });
       }
     }
   });
@@ -58,14 +65,16 @@ export async function runMaintenanceSweep() {
   if (now - lastRunAt < SWEEP_COOLDOWN_MS) return { skipped: true };
   lastRunAt = now;
 
+  const policy = await getPolicy();
+
   const pendingCutoff = new Date(
-    now - BOOKING_POLICY.pendingCancelMinutes * 60_000,
+    now - policy.pendingCancelMinutes * 60_000,
   );
   const noShowCutoff = new Date(
-    now - BOOKING_POLICY.noShowGraceMinutes * 60_000,
+    now - policy.noShowGraceMinutes * 60_000,
   );
   const autoCompleteCutoff = new Date(
-    now - BOOKING_POLICY.autoCompleteMinutes * 60_000,
+    now - policy.autoCompleteMinutes * 60_000,
   );
 
   const stalePending = await prisma.reservation.findMany({

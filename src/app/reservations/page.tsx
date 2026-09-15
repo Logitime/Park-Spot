@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
-import { apiGet, apiPost, apiPut } from "@/lib/api";
+import { apiGet, apiPost, apiPut, payForReservation } from "@/lib/api";
 import { formatCurrency, formatDate, statusBadge } from "@/lib/utils";
 import type { Reservation } from "@/lib/types";
 
@@ -46,13 +46,13 @@ export default function ReservationsPage() {
   async function payReservation(id: string) {
     setBusyId(id);
     try {
-      await apiPost("/api/payments", { reservationId: id });
-      await load();
+      const { mode } = await payForReservation(id);
+      if (mode === "demo") await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Payment failed");
-    } finally {
       setBusyId(null);
     }
+    // In checkout mode the page navigates to Stripe, so no final reset here.
   }
 
   async function checkIn(id: string) {

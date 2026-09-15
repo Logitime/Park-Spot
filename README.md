@@ -35,24 +35,41 @@ Key routes:
 - `/notifications` — notification center (emails use nodemailer; without
   `SMTP_HOST` they are logged to the console as `[email:disabled]`)
 - `/admin` — operator dashboard (revenue, occupancy, 7-day trend, CSV export)
-- `/admin/gate` — QR entry/exit console
-- `/admin/pricing` — dynamic pricing rules (zone/day/hour multipliers)
+  + tunable automation policy panel
+- `/admin/operations` — live ops board: on-site & arriving cars, overstays,
+  per-lot occupancy, activity feed (polls every 30s)
+- `/admin/gate` — QR entry/exit console + license-plate lookup
+  (`GET /api/admin/gate/lookup?plate=ABC` finds PENDING/CONFIRMED/ACTIVE
+  bookings by plate for gate check-in/out)
+- `/admin/pricing` — dynamic pricing rules (zone/day/hour multipliers) +
+  demand-based auto-surge preview / apply / rollback (`/api/admin/pricing/auto`)
+- `/admin/refunds` — payments, full/partial admin refunds, and the operator
+  audit trail (`/api/admin/audit`)
 - `POST /api/cron/maintenance` — no-show & release automation sweep
-  (auto-cancels unpaid PENDING reservations, releases no-show CONFIRMED spots,
-  auto-completes finished ACTIVE sessions). Call it with `x-cron-secret`
-  matching `CRON_SECRET`, or let the lots/spots endpoints trigger it
-  opportunistically (throttled to once per minute).
+  (auto-cancels unpaid PENDING reservations, releases no-show CONFIRMED spots
+  with an automatic refund, auto-completes finished ACTIVE sessions) + sends
+  the nightly ops report once per day (`/api/admin/settings` policy gates
+  sweep timings). Call it with `x-cron-secret` matching `CRON_SECRET`, or let
+  the lots/spots endpoints trigger it opportunistically (throttled to once per
+  minute).
 - `POST /api/webhooks/stripe` — Stripe checkout webhook (confirm + notify)
 
 ### Automation policy
 
-Configured in `src/lib/booking-policy.ts`:
+Defaults in `src/lib/booking-policy.ts`; the whole table is tunable at runtime
+by admins/operators via `GET`/`PUT /api/admin/settings` (web UI: the policy
+panel on `/admin`):
 
-| Setting                 | Default | Meaning                                       |
-| ----------------------- | ------- | --------------------------------------------- |
-| `pendingCancelMinutes`  | 10      | unpaid PENDING reservations are expired       |
-| `noShowGraceMinutes`    | 30      | CONFIRMED with no check-in past start+grace   |
-| `autoCompleteMinutes`   | 30      | ACTIVE past end+grace is auto-completed       |
+| Setting                | Default | Meaning                                             |
+| ---------------------- | ------- | --------------------------------------------------- |
+| `pendingCancelMinutes` | 10      | unpaid PENDING reservations are expired             |
+| `noShowGraceMinutes`   | 30      | CONFIRMED with no check-in past start+grace         |
+| `autoCompleteMinutes`  | 30      | ACTIVE past end+grace is auto-completed             |
+| `freeCancelMinutes`    | 15      | cancel within this window of start = full refund    |
+| `partialRefundEnabled` | true    | prorated refunds for early exit past free window    |
+| `surgeHighOccupancy`   | 85      | lot occupancy % that triggers auto-surge            |
+| `surgeMinMultiplier`   | 1.0     | auto-surge floor                                    |
+| `surgeMaxMultiplier`   | 2.5     | auto-surge ceiling                                  |
 
 ### Real payments (Stripe) — opt-in
 
@@ -65,8 +82,12 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
 - `POST /api/payments/checkout` creates a Stripe Checkout Session and returns
-  `{ sessionUrl }` (web client redirects the user there).
-- Cancelling a paid reservation issues a Stripe refund automatically.
+  `{ sessionUrl }` (web client redirects the user there; the mobile app opens
+  it via `Linking` and falls back to the demo flow when Stripe is unset).
+- Cancelling a paid reservation within the free-cancel window refunds in full;
+  later early exits get a prorated refund when `partialRefundEnabled`. Refunds
+  are recorded on the `Payment` (`REFUNDED`/`PARTIALLY_REFUNDED`) and logged
+  to the audit trail. Admin refunds/partials are available at `/admin/refunds`.
 - Configure the webhook endpoint in the Stripe dashboard at
   `<your-origin>/api/webhooks/stripe` with events:
   `checkout.session.completed`.
@@ -115,8 +136,12 @@ npm start                 # starts Expo dev server (Metro)
 
 - Find & book parking — browse lots, live availability, reserve a spot with
   start/duration presets (native datetime pickers can be added later).
-- Pay & QR gate pass — demo payment followed by the gate-pass QR shown in the
-  booking (scanned at `/admin/gate`).
+- License-plate booking — store a plate per reservation; gate staff can look
+  it up at `/admin/gate` to check in/out.
+- EV charging add-on — EV spots price in the lot's hourly charging rate
+  (`ParkingLot.evChargingRate`, default 0.50/hr), shown in the price estimate.
+- Pay & QR gate pass — Stripe checkout (demo-mode fallback) followed by the
+  gate-pass QR shown in the booking (scanned at `/admin/gate`).
 - My bookings + notifications — booking list, cancel, pay, mark alerts read.
 - Turn-by-turn navigation — "Navigate" deep-links to Google Maps (Android) or
   Apple Maps (iOS) at the lot's coordinates. No maps API keys required.

@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  password      String
+  role          String         @default("USER") // USER | OPERATOR | ADMIN
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  vehicles      Vehicle[]
+  reservations  Reservation[]
+  notifications Notification[]
+  lots          ParkingLot[]   @relation("LotOperator")
+}
+
+model Vehicle {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plateNumber String
+  type        String        @default("CAR") // CAR | MOTORCYCLE | TRUCK | VAN
+  color       String?
+  createdAt   DateTime      @default(now())
+  reservations Reservation[]
+}
+
+model ParkingLot {
+  id             String     @id @default(cuid())
+  name           String
+  address        String
+  latitude       Float
+  longitude      Float
+  totalSpots     Int
+  baseHourlyRate Float      @default(2.0)
+  operatorId     String?
+  operator       User?      @relation("LotOperator", fields: [operatorId], references: [id])
+  zones          Zone[]
+  createdAt      DateTime   @default(now())
+}
+
+model Zone {
+  id              String        @id @default(cuid())
+  lotId           String
+  lot             ParkingLot    @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  name            String
+  floor           Int
+  priceMultiplier Float         @default(1.0)
+  spots           Spot[]
+  pricingRules    PricingRule[]
+}
+
+model Spot {
+  id           String        @id @default(cuid())
+  zoneId       String
+  zone         Zone          @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  number       Int
+  status       String        @default("AVAILABLE") // AVAILABLE | OCCUPIED | RESERVED
+  size         String        @default("STANDARD") // COMPACT | STANDARD | LARGE
+  evCharging   Boolean       @default(false)
+  accessible   Boolean       @default(false)
+  pricePerHour Float         @default(2.0)
+  reservations Reservation[]
+
+  @@unique([zoneId, number])
+}
+
+model Reservation {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spotId     String
+  spot       Spot       @relation(fields: [spotId], references: [id])
+  vehicleId  String?
+  vehicle    Vehicle?   @relation(fields: [vehicleId], references: [id])
+  startTime  DateTime
+  endTime    DateTime
+  totalPrice Float
+  status     String     @default("PENDING") // PENDING | CONFIRMED | ACTIVE | COMPLETED | CANCELLED | EXPIRED
+  qrCode     String?    @unique
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  payments   Payment[]
+}
+
+model Payment {
+  id            String      @id @default(cuid())
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  amount        Float
+  status        String      @default("PENDING") // PENDING | PAID | REFUNDED | FAILED
+  provider      String      @default("STRIPE")
+  providerRef   String?
+  createdAt     DateTime    @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // RESERVATION_CONFIRMED | EXPIRY_REMINDER | SPOT_RELEASED | RESERVATION_REMINDER | ...
+  content   String
+  relatedId String? // optional id of the related entity (e.g. reservation id)
+  read      Boolean  @default(false)
+  emailSent Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model PricingRule {
+  id         String  @id @default(cuid())
+  zoneId     String
+  zone       Zone    @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  name       String
+  dayOfWeek  Int? // 0=Sunday .. 6=Saturday, null = every day
+  startHour  Int // inclusive, 0-23
+  endHour    Int // exclusive, 1-24
+  multiplier Float   @default(1.0)
+}

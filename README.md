@@ -1,36 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ParkSpot — Car Parking Guidance System
 
-## Getting Started
+Find, reserve, pay for, and navigate to parking spots. Includes a Next.js web
+app (PWA) and a React Native (Expo) mobile app sharing the same API.
 
-First, run the development server:
+## Web app
+
+Prerequisites: Node 20+, SQLite.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run db:migrate       # apply migrations (non-interactive: --skip-generate)
+npm run db:seed          # seed lots, zones, spots, demo users, pricing rules
+npm run dev              # http://localhost:4000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Production:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build && npm run start   # listens on port 4000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Demo accounts:
 
-## Learn More
+| Role    | Email                | Password |
+| ------- | -------------------- | -------- |
+| Admin   | admin@parking.com    | admin123 |
+| Operator| operator@parking.com | user123  |
+| User    | user@parking.com     | user123  |
 
-To learn more about Next.js, take a look at the following resources:
+Key routes:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `/` — find parking, live availability
+- `/reservations` — my bookings + QR gate pass
+- `/notifications` — notification center (emails use nodemailer; without
+  `SMTP_HOST` they are logged to the console as `[email:disabled]`)
+- `/admin` — operator dashboard (revenue, occupancy, 7-day trend, CSV export)
+- `/admin/gate` — QR entry/exit console
+- `/admin/pricing` — dynamic pricing rules (zone/day/hour multipliers)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Outbound email
 
-## Deploy on Vercel
+Set in `.env` to enable delivery (otherwise demo console logging):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+SMTP_HOST=...
+SMTP_PORT=587
+SMTP_USER=...
+SMTP_PASS=...
+SMTP_FROM="ParkSpot <noreply@parkspot.local>"
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Mobile app (Expo / React Native)
+
+Lives in [`mobile/`](./mobile). Same accounts and API as the web app; auth
+uses a bearer JWT stored in the device keychain (SecureStore).
+
+### Run
+
+```bash
+cd mobile
+npm install
+npm start                 # starts Expo dev server (Metro)
+```
+
+- **Phone with Expo Go** — scan the QR code. The app auto-detects your PC's
+  LAN IP from the Expo dev server and connects to port 4000, so your PC and
+  phone must be on the same network. Override with
+  `EXPO_PUBLIC_API_URL=http://<pc-ip>:4000` in `mobile/.env`.
+- **Android emulator** — falls back to `http://10.0.2.2:4000` automatically.
+- **iOS simulator** — macOS required; uses `http://localhost:4000`.
+
+### Features (milestone 1)
+
+- Find & book parking — browse lots, live availability, reserve a spot with
+  start/duration presets (native datetime pickers can be added later).
+- Pay & QR gate pass — demo payment followed by the gate-pass QR shown in the
+  booking (scanned at `/admin/gate`).
+- My bookings + notifications — booking list, cancel, pay, mark alerts read.
+- Turn-by-turn navigation — "Navigate" deep-links to Google Maps (Android) or
+  Apple Maps (iOS) at the lot's coordinates. No maps API keys required.
+
+## API auth
+
+- Web: httpOnly cookie `session`.
+- Mobile: `Authorization: Bearer <jwt>`; obtain the JWT from `POST /api/auth/login`
+  (response includes `token`).
+
+## Scripts
+
+| Script            | Purpose                                    |
+| ----------------- | ------------------------------------------ |
+| `dev`             | Next dev server on port 4000               |
+| `build` / `start` | Production build / server on port 4000     |
+| `lint`            | ESLint                                     |
+| `db:migrate`      | `prisma migrate dev --skip-generate`       |
+| `db:migrate:new`  | `prisma migrate dev --name <name>`         |
+| `db:seed`         | Seed demo data                             |
+| `db:reset`        | Reset + reseed (Prisma 7 requires `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION`) |

@@ -37,6 +37,47 @@ Key routes:
 - `/admin` — operator dashboard (revenue, occupancy, 7-day trend, CSV export)
 - `/admin/gate` — QR entry/exit console
 - `/admin/pricing` — dynamic pricing rules (zone/day/hour multipliers)
+- `POST /api/cron/maintenance` — no-show & release automation sweep
+  (auto-cancels unpaid PENDING reservations, releases no-show CONFIRMED spots,
+  auto-completes finished ACTIVE sessions). Call it with `x-cron-secret`
+  matching `CRON_SECRET`, or let the lots/spots endpoints trigger it
+  opportunistically (throttled to once per minute).
+- `POST /api/webhooks/stripe` — Stripe checkout webhook (confirm + notify)
+
+### Automation policy
+
+Configured in `src/lib/booking-policy.ts`:
+
+| Setting                 | Default | Meaning                                       |
+| ----------------------- | ------- | --------------------------------------------- |
+| `pendingCancelMinutes`  | 10      | unpaid PENDING reservations are expired       |
+| `noShowGraceMinutes`    | 30      | CONFIRMED with no check-in past start+grace   |
+| `autoCompleteMinutes`   | 30      | ACTIVE past end+grace is auto-completed       |
+
+### Real payments (Stripe) — opt-in
+
+When `STRIPE_SECRET_KEY` is unset the app runs an in-memory **demo payment**
+(instantly confirms). Set the env vars below to enable real checkout:
+
+```
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+- `POST /api/payments/checkout` creates a Stripe Checkout Session and returns
+  `{ sessionUrl }` (web client redirects the user there).
+- Cancelling a paid reservation issues a Stripe refund automatically.
+- Configure the webhook endpoint in the Stripe dashboard at
+  `<your-origin>/api/webhooks/stripe` with events:
+  `checkout.session.completed`.
+
+### Mobile + desktop push notifications
+
+- Web/mobile apps store a device token via `PUT /api/push-tokens`
+  (`expo-notifications` on the phone). Notifications are sent to registered
+  devices from `src/lib/push.ts`. Without an authenticated Expo project,
+  delivery requires `EXPO_ACCESS_TOKEN` (see `.env`), otherwise pushes are
+  attempted but fail gracefully (demo mode, same as email).
 
 ### Outbound email
 

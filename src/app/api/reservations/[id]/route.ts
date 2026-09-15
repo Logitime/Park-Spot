@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth";
 import { notifyUser } from "@/lib/notify";
+import { refundStripePayment } from "@/lib/stripe";
 
 export async function PUT(
   _request: NextRequest,
@@ -43,6 +44,24 @@ export async function PUT(
         await tx.payment.update({
           where: { id: payment.id },
           data: { status: "CANCELLED" },
+        });
+      } else if (payment.status === "PAID") {
+        const providerRef =
+          payment.provider === "STRIPE" && payment.providerRef
+            ? payment.providerRef
+            : null;
+
+        const refundRef =
+          providerRef
+            ? await refundStripePayment(providerRef, payment.amount)
+            : null;
+
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: refundRef ? "REFUNDED" : payment.status,
+            ...(refundRef ? { providerRef: refundRef } : {}),
+          },
         });
       }
     }

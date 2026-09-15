@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sendEmail, emailSubject } from "@/lib/email";
+import { sendPushNotification } from "@/lib/push";
 
 export interface NotifyArgs {
   userId: string;
@@ -7,6 +8,17 @@ export interface NotifyArgs {
   content: string;
   relatedId?: string | null;
 }
+
+const TYPE_TITLES: Record<string, string> = {
+  RESERVATION_PENDING: "Reservation pending",
+  RESERVATION_CONFIRMED: "Reservation confirmed",
+  RESERVATION_CANCELLED: "Reservation cancelled",
+  RESERVATION_REMINDER: "Parking reminder",
+  RESERVATION_STARTED: "Parking started",
+  RESERVATION_COMPLETED: "Parking completed",
+  EXPIRY_REMINDER: "Booking expiring soon",
+  SPOT_RELEASED: "Spot released",
+};
 
 export async function notifyUser({
   userId,
@@ -35,6 +47,13 @@ export async function notifyUser({
       });
     }
   }
+
+  await sendPushNotification({
+    userId,
+    title: TYPE_TITLES[type] ?? "ParkSpot",
+    body: content,
+    data: relatedId ? { relatedId } : undefined,
+  });
 
   return notification;
 }

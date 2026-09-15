@@ -1,0 +1,234 @@
+================================================================================
+ParkSpot Mobile App - Android Studio + APK Build Guide
+================================================================================
+
+This guide covers three ways to run the mobile app on Android:
+
+  [A] Develop + test immediately with Expo Go (easiest, no Android Studio)
+  [B] Develop in Android Studio (native android/ project)
+  [C] Build an installable APK (debug or release)
+
+Path conventions used below:
+  - Mobile app root      :  parking-app/mobile/
+  - Backend API root     :  parking-app/   (Next.js server, port 4000)
+
+
+--------------------------------------------------------------------------------
+0. PREREQUISITES
+--------------------------------------------------------------------------------
+
+Install these before anything else:
+
+  1. Node.js 20+            https://nodejs.org/
+  2. JDK 17 (very important - React Native 0.86 requires Java 17)
+                               https://adoptium.net/temurin/releases/?version=17
+  3. Android Studio (latest)  https://developer.android.com/studio
+       - During install, check: "Android SDK", "Android SDK Platform", and
+         "Android Virtual Device"
+  4. Android SDK Platform 35+ and Build-Tools 35+
+       - In Android Studio: Settings > Languages & Frameworks > Android SDK
+         > SDK Platforms (install "Android 15" / API 35)
+         > SDK Tools (install "Android SDK Build-Tools")
+  5. Verify git is installed (Android Gradle Plugin needs it)
+                               https://git-scm.com/
+
+Environment variables on Windows (set in System Properties > Environment
+Variables):
+    JAVA_HOME  = C:\Program Files\Eclipse Adoptium\jdk-17.0.x.x\
+    ANDROID_HOME = %LOCALAPPDATA%\Android\Sdk
+    ANDROID_SDK_ROOT = %LOCALAPPDATA%\Android\Sdk
+Also add to PATH:
+    %ANDROID_HOME%\platform-tools
+    %ANDROID_HOME%\emulator
+    %ANDROID_HOME%\cmdline-tools\latest\bin
+
+Verify from a terminal:
+    java -version          -> must show version 17
+    adb --version          -> must print Android Debug Bridge
+
+------------------------------------------------------------------------------
+[A] DEVELOP + TEST WITH EXPO GO (no Android Studio needed)
+------------------------------------------------------------------------------
+
+Quickest way to see the app on a phone while developing.
+
+  1. Start the backend server (from parking-app/):
+         npm run dev          ->  http://localhost:4000
+
+  2. Start Expo (from parking-app/mobile/):
+         npm start            ->  Metro on port 7081, shows a QR code
+
+  3. Install "Expo Go" from the Google Play Store on your Android phone.
+
+  4. Make sure the phone and PC are on the SAME Wi-Fi network.
+
+  5. Scan the QR code with Expo Go (Android: use the "Scan QR code" button
+     inside the Expo Go app itself).
+
+  6. Allow Node.js through Windows Firewall when prompted, otherwise the
+     phone cannot reach Metro or the API.
+
+Limitations of Expo Go / dev mode:
+  - Your PC must be on and the Metro terminal must keep running.
+  - No standalone APK is produced (that is option [B]/[C]).
+  - Hot reload: you can edit code in mobile/ and the phone updates live.
+
+
+--------------------------------------------------------------------------------
+[B] DEVELOP IN ANDROID STUDIO
+--------------------------------------------------------------------------------
+
+Generates a native android/ project from the Expo config, then opens it in
+Android Studio. You can then build/run/debug like a normal Android app.
+
+  1. (Recommended) Set the API URL for emulator use.
+     Android Studio emulators reach the PC via 10.0.2.2, which the app
+     already does automatically (see mobile/src/lib/constants.ts).
+     For a PHYSICAL phone over USB, create mobile/.env with:
+         EXPO_PUBLIC_API_URL=http://<your-LAN-IP>:4000
+
+  2. From parking-app/mobile/, generate the native project:
+         npx expo prebuild --platform android
+     This creates the android/ folder (uses package
+     com.parkspot.mobile from app.json). Run it with Metro STOPPED.
+
+  3. Open the project in Android Studio:
+         Open  parking-app/mobile/android  (File > Open)
+
+  4. Let Android Studio sync Gradle the first time (it downloads Gradle,
+     AGP, and dependencies - can take several minutes).
+
+  5. Get an emulator (if you do not have one):
+         Tools > Device Manager > "+" > Create Virtual Device
+         Pick a device (Pixel 7) and a system image (API 35).
+
+  6. Run the app:
+         - Click the green Play triangle with "app" selected.
+         - Android Studio builds, boots the emulator, installs and starts
+           the app. This runs the DEBUG build, which still needs Metro:
+         - In another terminal from parking-app/mobile/:  npm start
+           (keep it running for hot reload)
+
+     Important: debug builds load JS from Metro (port 7081). If you run the
+     emulator build and it shows "Could not connect to development server",
+     run:  adb reverse tcp:7081 tcp:7081
+     and for the API:  adb reverse tcp:4000 tcp:4000
+
+--------------------------------------------------------------------------------
+[C] BUILD AN INSTALLABLE APK
+--------------------------------------------------------------------------------
+
+You have two paths:
+
+------------------------------------------------------------------------------
+C1. LOCAL GRADLE BUILD (free, fully offline, no Expo account)
+------------------------------------------------------------------------------
+
+  1. Generate the native project (from parking-app/mobile/):
+         npx expo prebuild --platform android
+     (No need to open Android Studio; gradlew is enough.)
+
+  2. Set a fixed API URL if this APK will talk to a specific server
+     (create mobile/.env):
+         EXPO_PUBLIC_API_URL=http://<server-lan-ip-or-domain>:4000
+
+  3. Build the DEBUG APK (installs without signing worries):
+         cd android
+         .\gradlew assembleDebug
+     Output:  android\app\build\outputs\apk\debug\app-debug.apk
+     Install on any phone with USB debugging or by sending the file:
+
+         adb install -r android\app\build\outputs\apk\debug\app-debug.apk
+         (or just e-mail / transfer the .apk and tap it on the phone -
+          enable "Install unknown apps" in Android settings)
+
+  4. Build a RELEASE APK (smaller, optimized; needs a signing key):
+       4a. Create a keystore ONCE (keep it safe!):
+           keytool -genkeypair -v -keystore parkspot-release.keystore ^
+             -alias parkspot -keyalg RSA -keysize 2048 -validity 10000
+        4b. Configure signing in android/app/build.gradle
+           (add inside android { }):
+             signingConfigs {
+               release {
+                 if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
+                   storeFile file(MYAPP_UPLOAD_STORE_FILE)
+                   storePassword MYAPP_UPLOAD_STORE_PASSWORD
+                   keyAlias MYAPP_UPLOAD_KEY_ALIAS
+                   keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+                 }
+               }
+             }
+             buildTypes {
+               release {
+                 signingConfig signingConfigs.release
+               }
+             }
+        4c. Add these lines to android/gradle.properties:
+           MYAPP_UPLOAD_STORE_FILE=parkspot-release.keystore
+           MYAPP_UPLOAD_KEY_ALIAS=parkspot
+           MYAPP_UPLOAD_STORE_PASSWORD=your-store-password
+           MYAPP_UPLOAD_KEY_PASSWORD=your-key-password
+           (Put the .keystore file in android/app/)
+        4d. Build:
+           .\gradlew assembleRelease
+     Output: android\app\build\outputs\apk\release\app-release.apk
+
+NOTES:
+  - Debug APK is large (100-200 MB) and needs Metro running to load JS.
+    Release APK embeds the JS bundle, is small, and works fully offline.
+  - Never commit the .keystore or gradle.properties passwords.
+  - If you use Google Maps later, put your API key in
+    android/app/src/main/AndroidManifest.xml (app.json = "googleMapsApiKey").
+
+------------------------------------------------------------------------------
+C2. EAS BUILD (cloud build - easiest for a polished installable APK)
+------------------------------------------------------------------------------
+
+Uses Expo's cloud to produce a ready-to-install APK without touching gradle
+signing.
+
+  1. From parking-app/mobile/:
+         npm install -g eas-cli     (or: npx eas-cli ...)
+         eas login                  (create free Expo account)
+         eas init                   (links the project)
+         eas build:configure
+
+  2. Build an APK (Android Package) for testing:
+         eas build -p android --profile preview
+
+     It asks nothing about signing - EAS generates a debug keystore and
+     returns a download link when done. Download parkspot-*.apk and install
+     on the phone.
+
+  3. For Play Store upload use profile "production":
+         eas build -p android --profile production
+     (EAS then manages the upload key for you.)
+
+
+--------------------------------------------------------------------------------
+QUICK TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+- "Could not connect to development server"  -> run:
+    adb reverse tcp:7081 tcp:7081
+    adb reverse tcp:4000 tcp:4000
+- Phone in Expo Go cannot load the app       -> PC firewall must allow Node
+    on TCP 7081 and 4000; phone and PC on same Wi-Fi.
+- Gradle "Unsupported class file major version" -> JAVA_HOME is not Java 17.
+- API calls fail but the UI loads             -> set EXPO_PUBLIC_API_URL in
+    mobile/.env and re-run prebuild (env is baked in at build time).
+- Emulator cannot reach the server            -> the app auto-uses
+    http://10.0.2.2:4000 on Android. Confirm the server is running on the
+    PC and listening on port 4000.
+
+--------------------------------------------------------------------------------
+WHAT TO TEST AFTER INSTALL
+--------------------------------------------------------------------------------
+  1. Log in with  user@parking.com / user123
+  2. Find tab -> open a lot -> reserve a green spot -> pick duration
+  3. Bookings -> open booking -> "Pay now" -> QR gate pass is generated
+  4. Scan the QR on the web app at http://localhost:4000/admin/gate
+     (log in as operator@parking.com / user123)
+  5. Alerts tab -> unread count mirrors the web bell
+  6. "Navigate" button opens Google Maps at the lot location
+================================================================================

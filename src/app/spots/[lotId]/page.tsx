@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 import SearchFilters, { type SpotFilters } from "@/components/SearchFilters";
 import ParkingGrid from "@/components/ParkingGrid";
 import ReservationForm from "@/components/ReservationForm";
+import ForecastStrip from "@/components/ForecastStrip";
 import type { Lot, Spot, User } from "@/lib/types";
 
 function buildQuery(filters: SpotFilters): string {
@@ -175,6 +176,9 @@ export default function LotSpotsPage() {
                 onDone={handleReservationDone}
               />
             </div>
+          )}
+        {lot && (
+            <ForecastStrip lotId={lot.id} />
           )}
         </div>
       </div>

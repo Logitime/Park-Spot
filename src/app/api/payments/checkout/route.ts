@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth";
-import { notifyUser } from "@/lib/notify";
+import { createCheckoutSession, isStripeConfigured } from "@/lib/stripe";
 
 const schema = z.object({
   reservationId: z.string().min(1),
@@ -12,6 +12,13 @@ export async function POST(request: NextRequest) {
   const session = await requireSession().catch(() => null);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isStripeConfigured()) {
+    return NextResponse.json(
+      { error: "Stripe is not configured on this server." },
+      { status: 503 }
+    );
   }
 
   let body: unknown;
@@ -31,7 +38,9 @@ export async function POST(request: NextRequest) {
 
   const reservation = await prisma.reservation.findUnique({
     where: { id: parsed.data.reservationId },
-    include: { payments: true, spot: { include: { zone: true } } },
+    include: {
+      spot: { include: { zone: { include: { lot: { select: { name: true } } } } } },
+    },
   });
 
   if (!reservation || reservation.userId !== session.userId) {
@@ -48,35 +57,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Demo payment simulation (used when STRIPE_SECRET_KEY is unset).
-  // See /api/payments/checkout + /api/webhooks/stripe for the real flow.
-  const providerRef = `demo_${Math.random().toString(36).slice(2, 12)}`;
-
-  const payment = await prisma.$transaction(async (tx) => {
-    const updated = await tx.payment.update({
-      where: { id: reservation.payments[0].id },
-      data: { status: "PAID", providerRef },
-    });
-
-    await tx.reservation.update({
-      where: { id: reservation.id },
-      data: { status: "CONFIRMED" },
-    });
-
-    return updated;
+  const origin = new URL(request.url).origin;
+  const checkout = await createCheckoutSession({
+    reservationId: reservation.id,
+    amount: reservation.totalPrice,
+    description: `Parking at ${reservation.spot.zone.lot.name} — spot #${reservation.spot.number}`,
+    successUrl: `${origin}/reservations?paid=1`,
+    cancelUrl: `${origin}/reservations`,
   });
 
-  const content = `Payment received. Your parking reservation is confirmed for spot ${reservation.spot.zone.name} #${reservation.spot.number}.`;
-  await notifyUser({
-    userId: session.userId,
-    type: "RESERVATION_CONFIRMED",
-    content,
-    relatedId: reservation.id,
-  });
+  if (!checkout) {
+    return NextResponse.json(
+      { error: "Could not create a checkout session." },
+      { status: 502 }
+    );
+  }
 
-  return NextResponse.json({
-    payment,
-    reservation: { ...reservation, status: "CONFIRMED" },
-    message: "Payment successful. Reservation confirmed.",
-  });
+  return NextResponse.json({ sessionUrl: checkout.url });
 }

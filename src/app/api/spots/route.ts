@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { maybeRunSweep } from "@/lib/maintenance-sweep";
 import type { Prisma } from "@/generated/prisma/client";
 
 export async function GET(request: NextRequest) {
+  await maybeRunSweep();
+
   const searchParams = request.nextUrl.searchParams;
   const lotId = searchParams.get("lotId");
   const zoneId = searchParams.get("zoneId");

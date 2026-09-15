@@ -2,14 +2,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 import { api } from '@/src/lib/api';
 import { C, SIZE_LABEL, fmtMoney, openDirections, statusColor } from '@/src/lib/ui';
+import ForecastRow from '@/src/components/ForecastRow';
 import type { Spot } from '@/src/lib/types';
 
 type Section = { key: string; title: string; spots: Spot[] };
@@ -96,6 +99,29 @@ export default function LotScreen() {
               </Pressable>
             )}
           </View>
+          {lotLat !== undefined && lotLng !== undefined && Platform.OS !== 'web' && (
+            <View style={styles.mapPreview}>
+              <MapView
+                style={StyleSheet.absoluteFill}
+                scrollEnabled={false}
+                zoomEnabled={false}
+                pitchEnabled={false}
+                rotateEnabled={false}
+                initialRegion={{
+                  latitude: lotLat,
+                  longitude: lotLng,
+                  latitudeDelta: 0.015,
+                  longitudeDelta: 0.015,
+                }}
+              >
+                <Marker
+                  pinColor={C.teal}
+                  title={lotName}
+                  coordinate={{ latitude: lotLat, longitude: lotLng }}
+                />
+              </MapView>
+            </View>
+          )}
           {error && (
             <View style={styles.errorBox}>
               <Text style={styles.errorText}>{error}</Text>
@@ -104,6 +130,7 @@ export default function LotScreen() {
           <Text style={styles.hint}>
             Tap a green spot to book it. Pricing follows the zone multiplier.
           </Text>
+          <ForecastRow lotId={id} />
         </View>
       }
       data={sections}
@@ -184,6 +211,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   navBtnText: { color: C.teal, fontSize: 13, fontWeight: '600' },
+  mapPreview: {
+    height: 160,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
   errorBox: {
     marginTop: 12,
     backgroundColor: '#fff1f2',

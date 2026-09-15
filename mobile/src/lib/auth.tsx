@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { api, setAuthToken } from './api';
 import { getApiUrl } from './constants';
+import { registerPushToken, unregisterPushToken } from './push';
 import type { User } from './types';
 
 const TOKEN_KEY = 'parkspot_token';
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             const data = await api.get<{ user: User }>('/api/auth/me');
             setUser(data.user);
+            registerPushToken();
             return;
           } catch {
             await clearToken();
@@ -81,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthToken(data.token);
     await writeToken(data.token);
     setUser(data.user);
+    registerPushToken();
   }, []);
 
   const signUp = useCallback(
@@ -92,11 +95,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthToken(data.token);
       await writeToken(data.token);
       setUser(data.user);
+      registerPushToken();
     },
     []
   );
 
   const signOut = useCallback(async () => {
+    await unregisterPushToken();
     await clearToken();
     setAuthToken(null);
     setUser(null);

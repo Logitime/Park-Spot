@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { maybeRunSweep } from "@/lib/maintenance-sweep";
 
 export async function GET() {
+  await maybeRunSweep();
+
   const lots = await prisma.parkingLot.findMany({
     include: {
       zones: {

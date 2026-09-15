@@ -18,6 +18,7 @@ model User {
   vehicles      Vehicle[]
   reservations  Reservation[]
   notifications Notification[]
+  pushTokens    PushToken[]
   lots          ParkingLot[]   @relation("LotOperator")
 }
 
@@ -122,4 +123,14 @@ model PricingRule {
   startHour  Int // inclusive, 0-23
   endHour    Int // exclusive, 1-24
   multiplier Float   @default(1.0)
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String   @default("unknown") // ios | android | web
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

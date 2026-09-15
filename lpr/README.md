@@ -58,6 +58,31 @@ high-accuracy models are in `models/README.md`, `tools/`, and `data/README.md`.
 - [docs/API_INTEGRATION.md](docs/API_INTEGRATION.md) — how matching works
   against the ParkSpot API (Arabic + transliterated plates, auto check-in).
 
+## Multi-gate (entry + exit lanes)
+
+The service runs **any number of lanes**. Each lane has its own camera,
+LOGO! PLC, zone/lot filter and direction:
+
+- **ENTRY** (`decide()`) — verified paid booking in window → open + check-in.
+- **EXIT** (`exit_decide()`) — active session on record → open + auto check-out.
+
+```yaml
+gates:
+  - id: entry-1
+    name: Main Entry
+    direction: ENTRY
+    match: { filters: { lot: "LOT-1" } }
+  - id: exit-1
+    name: Main Exit
+    direction: EXIT
+    gate: { host: "192.168.0.11" }
+    match: { autoCheckout: true }
+```
+
+Configure gates in the **web admin** (Settings → Gate config `/admin/gates`):
+name, direction, camera (RTSP/USB), LOGO! PLC host/port/registers, lot+zone,
+assigned operators, plus live PLC diagnostics and a manual barrier Open/Close.
+
 ## Gate decision rules (summary)
 
 - Plate confidence >= `match.minConfidence` and active/PENDING booking found

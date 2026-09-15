@@ -1,5 +1,14 @@
 # Physical wiring reference
 
+## Multiple gates
+
+Repeat the lane below per gate. Each gate gets its **own** LOGO! 8 or CM
+Ethernet module (or use the TDE network) and its own RTSP camera. Give every
+LOGO! a different IP (`gate.host` per lane in `config.yaml`) and keep `unit`
+per Modbus-TCP client. One LPR PC can drive all lanes (multi-threaded;
+see `lpr/config.yaml` `gates:`). Entry and exit lanes use the same I/O wiring;
+only the matching policy differs.
+
 ## Block layout
 
 ```

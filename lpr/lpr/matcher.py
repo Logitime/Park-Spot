@@ -129,6 +129,27 @@ class ParkingApi:
         log.warning("auto check-in %s -> HTTP %s %s", reservation_id, r.status_code, r.text[:120])
         return False
 
+    def checkout(self, reservation_id: str) -> bool:
+        url = f"{self.base}/api/reservations/{quote(reservation_id)}/checkout"
+        r = requests.post(url, headers=self._headers(), timeout=self.timeout)
+        if r.status_code == 200:
+            return True
+        log.warning("auto check-out %s -> HTTP %s %s", reservation_id, r.status_code, r.text[:120])
+        return False
+
+
+def _matches_filters(c: BookingCandidate, filters: dict | None) -> bool:
+    """If lot/zone filters are set on the gate, discard non-matching candidates."""
+    if not filters:
+        return True
+    lot_filter = filters.get("lot", "")
+    zone_filter = filters.get("zone", "")
+    if lot_filter and lot_filter.lower() not in c.lot.lower():
+        return False
+    if zone_filter and zone_filter.lower() not in c.zone.lower():
+        return False
+    return True
+
 
 def _score(c: BookingCandidate, now: datetime) -> int:
     """Higher = better. ACTIVE first, then on-time CONFIRMED, then late."""
@@ -146,6 +167,7 @@ def decide(
     result: PlateResult,
     now: datetime | None = None,
     auto_checkin: bool = True,
+    filters: dict | None = None,
 ) -> GateDecision:
     now = now or datetime.now(timezone.utc)
     raw = normalize_arabic(result.text)
@@ -171,6 +193,10 @@ def decide(
         except ApiError as exc:
             log.error("lookup error for %r: %s", term, exc)
 
+    # apply gate zone/lot filter
+    if filters:
+        candidates = [c for c in candidates if _matches_filters(c, filters)]
+
     if not candidates:
         return GateDecision("DENY", "no booking for this plate", raw, result.confidence)
 
@@ -195,4 +221,73 @@ def decide(
         )
     return GateDecision(
         "DENY", "booking not confirmed", raw, result.confidence, best
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Exit-lane decision
+# --------------------------------------------------------------------------- #
+def exit_decide(
+    api: ParkingApi,
+    result: PlateResult,
+    now: datetime | None = None,
+    auto_checkout: bool = True,
+    filters: dict | None = None,
+) -> GateDecision:
+    """Exit gate: allow if there is an active session; auto-checkout.
+
+    ACTIVE → OPEN + checkout, COMPLETED/other → DENY.
+    """
+    now = now or datetime.now(timezone.utc)
+    raw = normalize_arabic(result.text)
+    search_terms = [raw]
+    if looks_arabic(raw):
+        latin = result.latin
+        if latin:
+            search_terms.append(latin)
+    else:
+        search_terms.append(coerce_plate(raw))
+
+    candidates: list[BookingCandidate] = []
+    seen: set[str] = set()
+    for term in search_terms:
+        if not term:
+            continue
+        try:
+            for cand in api.lookup(term):
+                if cand.reservation_id in seen:
+                    continue
+                seen.add(cand.reservation_id)
+                candidates.append(cand)
+        except ApiError as exc:
+            log.error("lookup error for %r: %s", term, exc)
+
+    if filters:
+        candidates = [c for c in candidates if _matches_filters(c, filters)]
+
+    active = [c for c in candidates if c.status == "ACTIVE"]
+
+    if not active:
+        return GateDecision(
+            "DENY",
+            "no active session for this plate",
+            raw,
+            result.confidence,
+            candidates[0] if candidates else None,
+        )
+
+    # pick the most recent ACTIVE session
+    best = max(active, key=lambda c: c.end_time.timestamp())
+
+    checkout_done = False
+    if auto_checkout:
+        checkout_done = api.checkout(best.reservation_id)
+
+    return GateDecision(
+        "OPEN",
+        "active session — checkout processed",
+        raw,
+        result.confidence,
+        best,
+        checkin_done=checkout_done,  # reused flag = "post-action done"
     )

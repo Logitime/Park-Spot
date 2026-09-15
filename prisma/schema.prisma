@@ -19,7 +19,8 @@ model User {
   reservations  Reservation[]
   notifications Notification[]
   pushTokens    PushToken[]
-  lots          ParkingLot[]   @relation("LotOperator")
+  lots          ParkingLot[]    @relation("LotOperator")
+  operatedGates Gate[]          @relation("GateOperator")
 }
 
 model Vehicle {
@@ -45,6 +46,7 @@ model ParkingLot {
   operatorId      String?
   operator        User?    @relation("LotOperator", fields: [operatorId], references: [id])
   zones           Zone[]
+  gates           Gate[]
   createdAt       DateTime @default(now())
 }
 
@@ -58,6 +60,7 @@ model Zone {
   spots           Spot[]
   pricingRules    PricingRule[]
   pricingEvents   PricingEvent[]
+  gates           Gate[]
 }
 
 model Spot {
@@ -165,4 +168,32 @@ model PricingEvent {
   createdById      String?
   createdByRole    String?
   createdAt        DateTime @default(now())
+}
+
+model Gate {
+  id            String    @id @default(cuid())
+  name          String
+  direction     String    @default("ENTRY") // ENTRY | EXIT
+  enabled       Boolean   @default(true)
+
+  cameraType    String    @default("rtsp") // rtsp | usb
+  rtspUrl       String?
+  usbDevice     Int       @default(0)
+  roi           String?   // JSON array "[x1,y1,x2,y2]"
+
+  plcHost       String
+  plcPort       Int       @default(502)
+  plcUnit       Int       @default(1)
+  plcRegisters  String?   // JSON register map: {"loop1":{kind,address},"open":{kind,address},...}
+  openSeconds   Float     @default(20)
+
+  lotId         String?
+  lot           ParkingLot? @relation(fields: [lotId], references: [id], onDelete: SetNull)
+  zoneId        String?
+  zone          Zone?     @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  operators     User[]    @relation("GateOperator")
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }

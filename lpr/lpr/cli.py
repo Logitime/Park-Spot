@@ -12,7 +12,7 @@ import numpy as np
 
 from . import __version__
 from .app import build_api, event_print, run
-from .config import Cfg, load_config, setup_logging
+from .config import Cfg, load_config, setup_logging, iter_gates
 from .gate.controller import GateController
 from .matcher import ApiError, ParkingApi
 from .ocr import OcrError
@@ -58,13 +58,28 @@ def cmd_selfcheck(args) -> int:
     else:
         problems.append("match.apiUrl not set — matching disabled")
 
-    plc = _make_plc(cfg)
-    if cfg.gate.get("enabled"):
-        if plc.connected:
-            log.info("plc: connected to %s:%s", cfg.gate["host"], cfg.gate["port"])
-        else:
-            ok = False
-            problems.append("plc: not connected (check LOGO! IP / program)")
+    specs = [s for s in iter_gates(cfg) if s.enabled]
+    if not specs:
+        log.warning("no enabled lanes in config")
+
+    for spec in specs:
+        lane = Cfg({
+            **cfg.as_dict(),
+            "gate": spec.gate,
+            "match": spec.match,
+            "app": dict(spec.app),
+            "laneId": spec.id,
+            "laneDirection": spec.direction,
+        })
+        plc = _make_plc(lane)
+        if spec.gate.get("enabled"):
+            if plc.connected:
+                log.info("[%s] plc: connected to %s:%s", spec.id, spec.gate.get("host"), spec.gate.get("port"))
+            else:
+                ok = False
+                problems.append(f"[{spec.id}] plc: not connected (check LOGO! IP / program)")
+        log.info("[%s] lane: direction=%s camera=%s", spec.id, spec.direction,
+                 spec.capture.get("url", spec.capture.get("device")))
 
     if problems:
         for p in problems:

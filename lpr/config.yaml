@@ -1,5 +1,9 @@
 # ParkSpot LPR + Siemens LOGO! gate service
 # All values are overridable by LPR_* / PARKSPOT_* / LOGO_* env vars.
+#
+# MULTI-GATE: add a top-level `gates:` list (see commented example at bottom).
+# If no `gates:` key is present, a single lane is built from the sections below
+# (backward-compatible with single-gate setups).
 
 capture:
   source: rtsp            # rtsp | usb
@@ -58,3 +62,43 @@ gate:
 
 app:
   loopHz: 10
+
+# ─── Multi-gate configuration (optional) ────────────────────────────────
+# Uncomment and customise to run multiple lanes.  Each entry inherits the
+# global capture/gate/match/app sections above as defaults; override per lane.
+#
+# gates:
+#   - id: entry-1
+#     name: Main Entry
+#     direction: ENTRY
+#     enabled: true
+#     capture:
+#       url: "rtsp://admin:pass@192.168.1.64:554/Streaming/Channels/101"
+#       roi: [0.1, 0.2, 0.9, 0.8]
+#     gate:
+#       host: "192.168.0.10"
+#       registers:
+#         loop1:          { kind: discrete, address: 0 }
+#         loop2:          { kind: discrete, address: 1 }
+#         gateOpenSensor: { kind: discrete, address: 2 }
+#         open:           { kind: coil,    address: 0 }
+#     match:
+#       autoCheckin: true
+#       filters: { lot: "LOT-1" }   # only match bookings in this lot
+#
+#   - id: exit-1
+#     name: Main Exit
+#     direction: EXIT
+#     enabled: true
+#     capture:
+#       url: "rtsp://admin:pass@192.168.1.65:554/Streaming/Channels/101"
+#     gate:
+#       host: "192.168.0.11"
+#       registers:
+#         loop1:          { kind: discrete, address: 0 }
+#         loop2:          { kind: discrete, address: 1 }
+#         gateOpenSensor: { kind: discrete, address: 2 }
+#         open:           { kind: coil,    address: 0 }
+#     match:
+#       autoCheckout: true   # exit lane checks the car out, not in
+#       filters: { lot: "LOT-1" }

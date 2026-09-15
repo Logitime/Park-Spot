@@ -60,7 +60,9 @@ export async function GET(request: NextRequest) {
         spot: {
           number: r.spot.number,
           zone: r.spot.zone.name,
+          zoneId: r.spot.zone.id,
           lot: r.spot.zone.lot.name,
+          lotId: r.spot.zone.lot.id,
         },
         paid: r.payments.some((p) => p.status === "PAID"),
       })),

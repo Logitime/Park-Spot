@@ -7,6 +7,7 @@ const TABS = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/operations", label: "Operations" },
   { href: "/admin/gate", label: "Entry & exit gate" },
+  { href: "/admin/gates", label: "Gate config" },
   { href: "/admin/pricing", label: "Dynamic pricing" },
   { href: "/admin/refunds", label: "Refunds & audit" },
 ];

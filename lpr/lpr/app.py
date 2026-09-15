@@ -1,4 +1,9 @@
-"""Service runtime: wires capture thread -> pipeline -> matcher -> gate loop."""
+"""Service runtime: wires capture threads -> pipelines -> controllers -> gates.
+
+Supports multiple entry/exit lanes.  Each lane runs its own capture thread,
+PLC connection and state machine; a shared ParkingApi instance talks to the
+ParkSpot server.  The main loop ticks all controllers at the configured Hz.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +13,7 @@ import time
 import numpy as np
 
 from .capture import PurchaseThread, make_source, ImageSource
-from .config import Cfg, setup_logging
+from .config import Cfg, GateSpec, iter_gates, setup_logging
 from .gate import GateController, make_plc
 from .matcher import ApiError, ParkingApi
 from .pipeline import PlatePipeline
@@ -26,62 +31,92 @@ def build_api(cfg: Cfg) -> ParkingApi | None:
 
 def event_print(event) -> None:
     """Default event sink: one structured log line per gate event."""
-    log.info("GATE %s | state=%s plate=%s conf=%.2f | %s",
-             event.kind, event.state, event.plate or "-", event.confidence,
-             event.reason or "-")
+    log.info("GATE %s [%s] | state=%s plate=%s conf=%.2f | %s",
+             event.kind, getattr(event, "lane", "?"), event.state,
+             event.plate or "-", event.confidence, event.reason or "-")
+
+
+def _lane_cfg(global_cfg: Cfg, spec: GateSpec) -> Cfg:
+    """Build a per-lane Cfg: global detection/ocr/tracking + lane capture/gate/match/app."""
+    d = dict(global_cfg.as_dict())
+    d["capture"] = spec.capture
+    d["gate"] = spec.gate
+    d["match"] = spec.match
+    d["app"] = dict(spec.app)
+    d["laneId"] = spec.id
+    d["laneDirection"] = spec.direction
+    return Cfg(d)
 
 
 def run(cfg: Cfg, runtime_seconds: float | None = None) -> None:
     setup_logging()
-    log.info("starting lpr service (demo=%s, gate.enabled=%s)",
-             cfg.ocr.get("demo"), cfg.gate.get("enabled"))
+    specs = [s for s in iter_gates(cfg) if s.enabled]
+    log.info("starting lpr service (%d lane(s), demo=%s)",
+             len(specs), cfg.ocr.get("demo"))
 
-    plc = make_plc(cfg)
-    if not plc.connected and cfg.gate.get("enabled"):
-        log.info("connecting to PLC…")
-        plc.connect()
+    # replay mode (--image / --video) — single lane only
+    if len(specs) == 1:
+        replay = specs[0].capture.get("replay")
+        if replay:
+            lane = _lane_cfg(cfg, specs[0])
+            plc = make_plc(lane)
+            if not plc.connected and lane.gate.get("enabled"):
+                plc.connect()
+            pipeline = PlatePipeline(cfg)
+            api = build_api(cfg)
+            controller = GateController(lane, plc, pipeline, api, events=event_print)
+            source = ImageSource(replay, loop=bool(specs[0].capture.get("replayLoop", False)))
+            _run_replay(source, controller, runtime_seconds)
+            return
 
-    pipeline = PlatePipeline(cfg)
     api = build_api(cfg)
-    controller = GateController(cfg, plc, pipeline, api, events=event_print)
+    detection_cfg = cfg  # shared detection/ocr (GPU)
 
-    # replay mode (--image/-video) vs live capture
-    replay = cfg.capture.get("replay")
-    if replay:
-        source = ImageSource(replay, loop=bool(cfg.capture.get("replayLoop", False)))
-        _run_replay(source, controller, runtime_seconds)
+    lanes: list[tuple[PurchaseThread, GateController]] = []
+
+    for spec in specs:
+        lane = _lane_cfg(cfg, spec)
+        plc = make_plc(lane)
+        if not plc.connected and lane.gate.get("enabled"):
+            plc.connect()
+        pipeline = PlatePipeline(detection_cfg)
+        controller = GateController(lane, plc, pipeline, api, events=event_print)
+        source = make_source(lane)
+        purchase = PurchaseThread(source)
+        purchase.start()
+        lanes.append((purchase, controller))
+        log.info("lane %s (%s) started: camera=%s plc=%s",
+                 spec.id, spec.direction, spec.capture.get("url", spec.capture.get("device")),
+                 lane.gate.get("host"))
+
+    if not lanes:
+        log.warning("no enabled lanes — nothing to do")
         return
-
-    source = make_source(cfg)
-    purchase = PurchaseThread(source)
-    purchase.start()
-    log.info("capture thread started")
 
     loop_hz = float(cfg.app.get("loopHz", 10.0))
     period = 1.0 / max(1.0, loop_hz)
     start = time.monotonic()
     last = start
-    intervals: list[float] = []
+
     try:
         while True:
             now = time.monotonic()
             elapsed = now - last
             if elapsed >= period:
                 last = now
-                frame = purchase.latest()
-                controller.loop(frame)
-                intervals.append(elapsed)
-                if len(intervals) > 100:
-                    intervals.pop(0)
+                for purchase, controller in lanes:
+                    frame = purchase.latest()
+                    controller.loop(frame)
             if runtime_seconds is not None and now - start > runtime_seconds:
                 break
             time.sleep(0.005)
     except KeyboardInterrupt:
         log.info("shutdown requested")
     finally:
-        purchase.stop()
-        controller._close_barrier()
-        log.info("service stopped")
+        for purchase, controller in lanes:
+            purchase.stop()
+            controller._close_barrier()
+        log.info("service stopped (%d lane(s))", len(lanes))
 
 
 def _run_replay(source: ImageSource, controller: GateController, seconds: float | None) -> None:

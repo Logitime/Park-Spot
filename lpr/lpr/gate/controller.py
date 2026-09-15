@@ -26,7 +26,7 @@ from typing import Callable
 import numpy as np
 
 from ..config import Cfg
-from ..matcher import GateDecision, ParkingApi, decide
+from ..matcher import GateDecision, ParkingApi, decide, exit_decide
 from ..ocr import PlateResult
 from ..pipeline import PlatePipeline
 from ..util import Timer
@@ -40,6 +40,8 @@ STATE_NAME = ["IDLE", "CAR_PRESENT", "DECIDING", "OPENING", "CLOSING", "DENIED",
 
 @dataclass
 class Config:
+    lane_id: str = "default"
+    direction: str = "ENTRY"  # ENTRY | EXIT
     loop_hz: float = 10.0
     open_seconds: float = 20.0
     post_car_grace: float = 1.5
@@ -48,12 +50,15 @@ class Config:
     deny_block_seconds: float = 8.0
     min_confidence: float = 0.55
     auto_checkin: bool = True
+    auto_checkout: bool | None = None  # None → fall back to auto_checkin (EXIT lanes)
+    filters: dict | None = None  # lot/zone filter from gate spec
 
 
 @dataclass
 class GateEvent:
     kind: str
     ts: float = field(default_factory=time.time)
+    lane: str = ""
     state: str = ""
     plate: str = ""
     confidence: float = 0.0
@@ -64,6 +69,7 @@ class GateEvent:
         return {
             "event": self.kind,
             "ts": round(self.ts, 3),
+            "lane": self.lane,
             "state": self.state,
             "plate": self.plate,
             "confidence": round(self.confidence, 3),
@@ -89,6 +95,8 @@ class GateController:
         self.emit_hook = events or (lambda e: None)
         g = cfg.gate
         c = gcfg or Config(
+            lane_id=str(cfg.get("laneId", "default")),
+            direction=str(cfg.get("laneDirection", "ENTRY")),
             loop_hz=float(cfg.app.get("loopHz", 10.0)),
             open_seconds=float(g.get("openSeconds", 20.0)),
             post_car_grace=float(g.get("postCarGrace", 1.5)),
@@ -97,6 +105,8 @@ class GateController:
             deny_block_seconds=float(g.get("denyBlockSeconds", 8.0)),
             min_confidence=float(cfg.match.get("minConfidence", 0.55)),
             auto_checkin=bool(cfg.match.get("autoCheckin", True)),
+            auto_checkout=cfg.match.get("autoCheckout"),
+            filters=cfg.match.get("filters"),
         )
         self.c = c
 
@@ -112,12 +122,12 @@ class GateController:
 
     # ------------------------------------------------------------------ #
     def emit(self, kind, plate="", conf=0.0, reason="", decision=None) -> None:
-        ev = GateEvent(kind, state=STATE_NAME[self.state], plate=plate,
+        ev = GateEvent(kind, lane=self.c.lane_id, state=STATE_NAME[self.state], plate=plate,
                        confidence=conf, reason=reason, decision=decision)
         self.emit_hook(ev)
         log.info(
-            "EVENT %s (state=%s plate=%r conf=%.2f %s)",
-            kind, ev.state, plate, conf, reason,
+            "EVENT %s [%s] (state=%s plate=%r conf=%.2f %s)",
+            kind, self.c.lane_id, ev.state, plate, conf, reason,
         )
 
     def _snapshot(self) -> dict[str, bool]:
@@ -263,9 +273,22 @@ class GateController:
                       reason="no matcher configured (offline mode)")
             return
         try:
-            decision: GateDecision = decide(
-                self.api, read, auto_checkin=self.c.auto_checkin
-            )
+            if self.c.direction == "EXIT":
+                decision: GateDecision = exit_decide(
+                    self.api, read,
+                    auto_checkout=(
+                        self.c.auto_checkout
+                        if self.c.auto_checkout is not None
+                        else self.c.auto_checkin
+                    ),
+                    filters=self.c.filters,
+                )
+            else:
+                decision = decide(
+                    self.api, read,
+                    auto_checkin=self.c.auto_checkin,
+                    filters=self.c.filters,
+                )
         except Exception as exc:  # noqa: BLE001
             self._fault(f"matcher failure: {exc}")
             return

@@ -26,3 +26,24 @@ body {
 .animate-rise {
   animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+.input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #0f172a;
+  background-color: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.input:focus {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 1px #14b8a6;
+}
+.input::placeholder {
+  color: #94a3b8;
+}

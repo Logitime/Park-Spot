@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 try:
@@ -210,5 +211,88 @@ def load_config(path: Path | str, env_prefix: str = "LPR") -> Cfg:
             "tracking": tracking,
             "gate": gate,
             "app": app_raw,
+            "gates": raw.get("gates", []),
         }
     )
+
+
+# --------------------------------------------------------------------------- #
+# Multi-gate spec
+# --------------------------------------------------------------------------- #
+@dataclass
+class GateSpec:
+    """Per-lane configuration built by merging a gate entry with global defaults."""
+
+    id: str
+    name: str
+    direction: str  # "ENTRY" | "EXIT"
+    enabled: bool
+    capture: dict  # capture section (url, device, roi…)
+    gate: dict  # plc + timing section
+    match: dict  # match section (autoCheckin, zone/lot filter…)
+    app: dict  # loopHz etc.
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Shallow recursive merge: override wins; list replaces entirely."""
+    out = dict(base)
+    for k, v in override.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def iter_gates(cfg: Cfg) -> list[GateSpec]:
+    """Yield one :class:`GateSpec` per configured lane.
+
+    If the YAML has a top-level ``gates:`` list, each entry is merged with
+    the global ``capture``/``gate``/``match``/``app`` sections as defaults.
+    If there is no ``gates:`` list (backward-compatible), a single gate
+    is synthesised from the top-level sections.
+    """
+    raw_gates = cfg.get("gates")
+    if not isinstance(raw_gates, list) or len(raw_gates) == 0:
+        # legacy single-lane: synthesise from top-level
+        return [
+            GateSpec(
+                id="default",
+                name="default",
+                direction="ENTRY",
+                enabled=bool(cfg.gate.get("enabled", True)),
+                capture=dict(cfg.capture),
+                gate=dict(cfg.gate),
+                match=dict(cfg.match),
+                app=dict(cfg.app),
+            )
+        ]
+
+    gate_specs: list[GateSpec] = []
+    for i, entry in enumerate(raw_gates):
+        if not isinstance(entry, dict):
+            continue
+        gid = str(entry.get("id", f"gate-{i}"))
+        gname = str(entry.get("name", gid))
+        direction = "EXIT" if str(entry.get("direction", "ENTRY")).upper() == "EXIT" else "ENTRY"
+        enabled = bool(entry.get("enabled", True))
+
+        gate_section = _deep_merge(cfg.gate, entry.get("gate", {}))
+        capture_section = _deep_merge(cfg.capture, entry.get("capture", {}))
+        match_section = _deep_merge(cfg.match, entry.get("match", {}))
+        app_section = _deep_merge(cfg.app, entry.get("app", {}))
+
+        gate_specs.append(
+            GateSpec(
+                id=gid,
+                name=gname,
+                direction=direction,
+                enabled=enabled,
+                capture=capture_section,
+                gate=gate_section,
+                match=match_section,
+                app=app_section,
+            )
+        )
+
+    return gate_specs

@@ -17,8 +17,17 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await apiPost("/api/auth/login", { email, password });
-      router.push("/");
+      const res = await apiPost<{ user: { role: string } }>(
+        "/api/auth/login",
+        { email, password }
+      );
+      if (res.user.role === "ADMIN") {
+        router.push("/admin");
+      } else if (res.user.role === "OPERATOR") {
+        router.push("/admin/operator");
+      } else {
+        router.push("/");
+      }
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

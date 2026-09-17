@@ -8,19 +8,21 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(cuid())
+  id            String           @id @default(cuid())
   name          String
-  email         String         @unique
+  email         String           @unique
   password      String
-  role          String         @default("USER") // USER | OPERATOR | ADMIN
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  role          String           @default("USER") // USER | OPERATOR | ADMIN
+  enabled       Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
   vehicles      Vehicle[]
   reservations  Reservation[]
   notifications Notification[]
   pushTokens    PushToken[]
-  lots          ParkingLot[]    @relation("LotOperator")
-  operatedGates Gate[]          @relation("GateOperator")
+  lots          ParkingLot[]     @relation("LotOperator")
+  operatedGates Gate[]           @relation("GateOperator")
+  assignments   ShiftAssignment[]
 }
 
 model Vehicle {
@@ -192,8 +194,51 @@ model Gate {
   zoneId        String?
   zone          Zone?     @relation(fields: [zoneId], references: [id], onDelete: SetNull)
 
-  operators     User[]    @relation("GateOperator")
+  operators     User[]           @relation("GateOperator")
+  assignments   ShiftAssignment[]
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model Shift {
+  id          String            @id @default(cuid())
+  name        String
+  startTime   String            // "HH:MM" 24h
+  endTime     String            // "HH:MM" 24h (may cross midnight)
+  enabled     Boolean           @default(true)
+  assignments ShiftAssignment[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model ShiftAssignment {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shiftId String
+  shift   Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  gateId  String
+  gate    Gate   @relation(fields: [gateId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shiftId, gateId])
+  @@index([shiftId])
+  @@index([gateId])
+}
+
+model LprEvent {
+  id         String   @id @default(cuid())
+  lane       String
+  direction  String   @default("ENTRY") // ENTRY | EXIT
+  kind       String   // VEHICLE_ENTER | DECISION | OPEN | DENY | FAULT | ...
+  state      String   @default("")
+  plate      String   @default("")
+  confidence Float    @default(0)
+  reason     String   @default("")
+  action     String   @default("") // OPEN | DENY | HOLD (from the gate decision)
+  payload    String? // JSON decision payload
+  createdAt  DateTime @default(now())
+
+  @@index([lane])
+  @@index([createdAt])
 }

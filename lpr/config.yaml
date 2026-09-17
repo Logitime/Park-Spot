@@ -63,6 +63,14 @@ gate:
 app:
   loopHz: 10
 
+# Optional live-view server for the ParkSpot operator dashboard.
+# Serves: GET /status, /snapshot/<lane>, /stream/<lane> (MJPEG).
+web:
+  enabled: false           # set true to enable the camera/status endpoints
+  host: "0.0.0.0"
+  port: 8601               # e.g. http://<lpr-host>:8601
+  token: ""                # optional access token (?t=...) — falls back to match.token
+
 # ─── Multi-gate configuration (optional) ────────────────────────────────
 # Uncomment and customise to run multiple lanes.  Each entry inherits the
 # global capture/gate/match/app sections above as defaults; override per lane.

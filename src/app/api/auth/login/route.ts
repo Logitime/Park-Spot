@@ -46,6 +46,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!user.enabled) {
+    return NextResponse.json(
+      { error: "This account has been disabled. Contact your administrator." },
+      { status: 403 }
+    );
+  }
+
   const payload = { userId: user.id, email: user.email, role: user.role };
   const token = await signSession(payload);
   await setSessionCookie(payload);

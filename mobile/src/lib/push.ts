@@ -33,10 +33,14 @@ export async function registerPushToken(): Promise<string | null> {
       platform: Platform.OS,
     });
     return token.data;
-  } catch (error) {
-    console.warn('[push] token registration failed:', error);
+  } catch (error: any) {
+    if (__DEV__) {
+      // Only log brief message in dev if Firebase isn't set up yet
+      console.log('[push] Push notifications not configured (requires google-services.json)');
+    }
     return null;
   }
+
 }
 
 export async function unregisterPushToken(): Promise<void> {

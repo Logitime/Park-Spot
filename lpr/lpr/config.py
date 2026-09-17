@@ -202,6 +202,13 @@ def load_config(path: Path | str, env_prefix: str = "LPR") -> Cfg:
     app_raw.setdefault("loopHz", 10.0)
     app_raw.setdefault("events", None)  # optional http/webhook sink (future)
 
+    web = sec("web")
+    web["enabled"] = shorthand_bool(web, ["enabled"], False)
+    web["enabled"] = str(env_or(env_prefix, "WEB_ENABLED", web["enabled"])).lower() not in ("0", "false", "")
+    web["host"] = env_or(env_prefix, "WEB_HOST", web.get("host", "0.0.0.0"))
+    web["port"] = int(env_or(env_prefix, "WEB_PORT", str(web.get("port", 8601))))
+    web["token"] = web.get("token") or match.get("token", "")
+
     return Cfg(
         {
             "capture": capture,
@@ -211,6 +218,7 @@ def load_config(path: Path | str, env_prefix: str = "LPR") -> Cfg:
             "tracking": tracking,
             "gate": gate,
             "app": app_raw,
+            "web": web,
             "gates": raw.get("gates", []),
         }
     )

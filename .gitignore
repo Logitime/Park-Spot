@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+**/node_modules.hidden
+**/node_modules.npm*
 /.pnp
 .pnp.*
 .yarn/*
@@ -16,6 +18,12 @@
 # next.js
 /.next/
 /out/
+
+# expo
+.expo/
+
+# backup copies
+mobile - Copy/
 
 # production
 /build

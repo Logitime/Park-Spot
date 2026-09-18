@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { api, setAuthToken } from './api';
-import { getApiUrl } from './constants';
+import { getApiUrl, setApiUrl, clearApiUrl } from './constants';
 import { registerPushToken, unregisterPushToken } from './push';
 import type { User } from './types';
 
@@ -119,8 +119,4 @@ export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
   return ctx;
-}
-
-export function serverUrlLabel(): string {
-  return getApiUrl();
 }

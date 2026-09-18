@@ -1,20 +1,39 @@
-import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { api } from './api';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+const isExpoGo =
+  Constants.appOwnership === 'expo' ||
+  (Constants as any).executionEnvironment === 'storeClient';
+
+let NotificationsModule: typeof import('expo-notifications') | null = null;
+
+async function getNotifications() {
+  if (Platform.OS === 'web' || isExpoGo) return null;
+  if (NotificationsModule) return NotificationsModule;
+  try {
+    const mod = await import('expo-notifications');
+    mod.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+    NotificationsModule = mod;
+    return mod;
+  } catch {
+    return null;
+  }
+}
 
 export async function registerPushToken(): Promise<string | null> {
-  if (Platform.OS === 'web') return null;
+  if (Platform.OS === 'web' || isExpoGo) return null;
   try {
+    const Notifications = await getNotifications();
+    if (!Notifications) return null;
+
     const existing = await Notifications.getPermissionsAsync();
     let status = existing.status;
     if (status !== 'granted') {
@@ -33,18 +52,16 @@ export async function registerPushToken(): Promise<string | null> {
       platform: Platform.OS,
     });
     return token.data;
-  } catch (error: any) {
+  } catch {
     if (__DEV__) {
-      // Only log brief message in dev if Firebase isn't set up yet
-      console.log('[push] Push notifications not configured (requires google-services.json)');
+      console.log('[push] Push notifications not configured or not supported in current client');
     }
     return null;
   }
-
 }
 
 export async function unregisterPushToken(): Promise<void> {
-  if (Platform.OS === 'web') return;
+  if (Platform.OS === 'web' || isExpoGo) return;
   try {
     await api.del('/api/push-tokens', {});
   } catch {

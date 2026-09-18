@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -10,7 +10,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { serverUrlLabel, useAuth } from '@/src/lib/auth';
+import { useAuth } from '@/src/lib/auth';
+import { getApiUrl, setApiUrl, clearApiUrl } from '@/src/lib/constants';
 import { C } from '@/src/lib/ui';
 import {
   Card,
@@ -28,6 +29,12 @@ export default function AccountScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [serverUrl, setServerUrl] = useState('');
+  const [serverSaved, setServerSaved] = useState(false);
+
+  useEffect(() => {
+    getApiUrl().then(setServerUrl);
+  }, []);
 
   const submit = async () => {
     setError(null);
@@ -58,12 +65,12 @@ export default function AccountScreen() {
             </View>
           </Card>
 
-          <ScreenSection title="Server">
-            <Card>
-              <Text style={styles.small}>API server</Text>
-              <Text style={styles.code}>{serverUrlLabel()}</Text>
-            </Card>
-          </ScreenSection>
+          <ServerSection
+            serverUrl={serverUrl}
+            setServerUrl={setServerUrl}
+            serverSaved={serverSaved}
+            setServerSaved={setServerSaved}
+          />
 
           <PrimaryButton label="Log out" tone="rose" onPress={() => signOut()} />
         </ScrollView>
@@ -137,6 +144,13 @@ export default function AccountScreen() {
             </View>
           </Card>
 
+          <ServerSection
+            serverUrl={serverUrl}
+            setServerUrl={setServerUrl}
+            serverSaved={serverSaved}
+            setServerSaved={setServerSaved}
+          />
+
           <View style={styles.demo}>
             <Text style={styles.demoTitle}>Demo accounts</Text>
             <Text style={styles.small}>user@parking.com / user123</Text>
@@ -145,6 +159,63 @@ export default function AccountScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+function ServerSection({
+  serverUrl,
+  setServerUrl,
+  serverSaved,
+  setServerSaved,
+}: {
+  serverUrl: string;
+  setServerUrl: (v: string) => void;
+  serverSaved: boolean;
+  setServerSaved: (v: boolean) => void;
+}) {
+  return (
+    <ScreenSection title="Server Connection">
+      <Card>
+        <Text style={styles.small}>
+          Backend URL (use your computer's LAN IP if testing on a physical phone)
+        </Text>
+        <TextInput
+          value={serverUrl}
+          onChangeText={(v) => {
+            setServerUrl(v);
+            setServerSaved(false);
+          }}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          placeholder="http://192.168.1.59:4000"
+          placeholderTextColor={C.muted}
+          style={styles.input}
+        />
+        {serverSaved && (
+          <Text style={{ fontSize: 12, color: C.teal, marginTop: 6 }}>Saved!</Text>
+        )}
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+          <PrimaryButton
+            label="Save URL"
+            onPress={async () => {
+              await setApiUrl(serverUrl.trim());
+              setServerSaved(true);
+            }}
+          />
+          <PrimaryButton
+            label="Reset"
+            tone="outline"
+            onPress={async () => {
+              await clearApiUrl();
+              const fresh = await getApiUrl();
+              setServerUrl(fresh);
+              setServerSaved(true);
+            }}
+          />
+        </View>
+      </Card>
+    </ScreenSection>
   );
 }
 

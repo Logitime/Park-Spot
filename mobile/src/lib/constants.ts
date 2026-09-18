@@ -1,9 +1,17 @@
+import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-export function getApiUrl(): string {
-  const override = process.env.EXPO_PUBLIC_API_URL;
-  if (override) return override.replace(/\/+$/, '');
+const API_URL_KEY = 'api_url';
+const DEFAULT_PORT = 4000;
+
+export async function getApiUrl(): Promise<string> {
+  const saved = await SecureStore.getItemAsync(API_URL_KEY);
+  if (saved) return saved;
+
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, '');
+  }
 
   const hostUri =
     Constants.expoConfig?.hostUri ??
@@ -12,10 +20,18 @@ export function getApiUrl(): string {
   const host = hostUri?.split(':')[0];
 
   if (host && host !== 'localhost' && host !== '127.0.0.1') {
-    return `http://${host}:4000`;
+    return `http://${host}:${DEFAULT_PORT}`;
   }
   if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:4000';
+    return `http://10.0.2.2:${DEFAULT_PORT}`;
   }
-  return 'http://localhost:4000';
+  return `http://localhost:${DEFAULT_PORT}`;
+}
+
+export async function setApiUrl(url: string) {
+  await SecureStore.setItemAsync(API_URL_KEY, url.replace(/\/+$/, ''));
+}
+
+export async function clearApiUrl() {
+  await SecureStore.deleteItemAsync(API_URL_KEY);
 }

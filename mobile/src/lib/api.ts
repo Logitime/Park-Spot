@@ -20,13 +20,14 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const baseUrl = await getApiUrl();
   const headers: Record<string, string> = {};
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
 
   let res: Response;
   try {
-    res = await fetch(`${getApiUrl()}${path}`, {
+    res = await fetch(`${baseUrl}${path}`, {
       ...options,
       headers: {
         ...headers,

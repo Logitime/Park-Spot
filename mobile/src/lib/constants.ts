@@ -22,6 +22,9 @@ export async function getApiUrl(): Promise<string> {
   if (host && host !== 'localhost' && host !== '127.0.0.1') {
     return `http://${host}:${DEFAULT_PORT}`;
   }
+  if (!__DEV__) {
+    return 'https://park-spot-fawn.vercel.app';
+  }
   if (Platform.OS === 'android') {
     return `http://10.0.2.2:${DEFAULT_PORT}`;
   }

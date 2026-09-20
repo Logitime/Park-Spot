@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiDelete, apiGet, apiPut } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
-import AdminTabs from "@/components/AdminTabs";
 
 type LaneStatus = {
   id: string;
@@ -50,10 +49,14 @@ type LprEvent = {
 const POLL_EVENTS_MS = 3000;
 const POLL_STATUS_MS = 5000;
 
+let cachedOpStatus: Status | null = null;
+let cachedOpEvents: LprEvent[] = [];
+let cachedOpMe: { role: string } | null = null;
+
 export default function OperatorPage() {
-  const [status, setStatus] = useState<Status | null>(null);
-  const [events, setEvents] = useState<LprEvent[]>([]);
-  const [me, setMe] = useState<{ role: string } | null>(null);
+  const [status, setStatus] = useState<Status | null>(cachedOpStatus);
+  const [events, setEvents] = useState<LprEvent[]>(cachedOpEvents);
+  const [me, setMe] = useState<{ role: string } | null>(cachedOpMe);
   const [error, setError] = useState<string | null>(null);
 
   // camera server config (admin only)
@@ -71,6 +74,7 @@ export default function OperatorPage() {
       const data = await apiGet<{ events: LprEvent[] }>(
         "/api/admin/lpr/events?limit=60"
       );
+      cachedOpEvents = data.events;
       setEvents(data.events);
       setError(null);
     } catch (e) {
@@ -82,6 +86,7 @@ export default function OperatorPage() {
     if (typeof document !== "undefined" && document.hidden) return;
     try {
       const data = await apiGet<Status>("/api/admin/lpr/status");
+      cachedOpStatus = data;
       setStatus(data);
       setError(null);
     } catch (e) {
@@ -154,7 +159,7 @@ export default function OperatorPage() {
   const updatedAt = events[0]?.createdAt;
 
   return (
-    <main className="mx-auto max-w-7xl flex-1 px-4 py-8 sm:px-6">
+    <main className="mx-auto w-full max-w-7xl flex-1 px-3 sm:px-6 py-6 sm:py-8 min-w-0">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800">Operator view</h1>
         <p className="mt-1 text-sm text-slate-500">
@@ -162,8 +167,6 @@ export default function OperatorPage() {
           Events auto-refresh every {POLL_EVENTS_MS / 1000}s.
         </p>
       </div>
-
-      <AdminTabs />
 
       {/* ── LPR connectivity banner ───────────────────────────────────── */}
       <div
@@ -426,7 +429,7 @@ function EventRow({ ev }: { ev: LprEvent }) {
   const p = ev.payload;
   const hasPlate = Boolean(ev.plate);
   return (
-    <li className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+    <li className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:px-4 sm:py-3 min-w-0 max-w-full break-words">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span

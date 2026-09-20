@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePolling } from "@/lib/usePolling";
 import { apiGet } from "@/lib/api";
@@ -10,11 +10,19 @@ import type { Lot, LotAvailability } from "@/lib/types";
 export default function Home() {
   const [search, setSearch] = useState("");
 
+  useEffect(() => {
+    void apiGet<{ user: { role: string } | null }>("/api/auth/me").then((d) => {
+      if (d.user?.role === "OPERATOR") {
+        window.location.replace("/admin/operator");
+      }
+    });
+  }, []);
+
   const fetchLots = useCallback(
     () => apiGet<{ lots: Lot[] }>("/api/lots"),
     []
   );
-  const { data: lotsData, loading } = usePolling(fetchLots, 60_000);
+  const { data: lotsData, loading } = usePolling(fetchLots, 60_000, "home_lots");
 
   const fetchAvailability = useCallback(
     () => apiGet<{ availability: LotAvailability[] }>("/api/availability"),
@@ -23,7 +31,7 @@ export default function Home() {
   const {
     data: availabilityData,
     loading: availabilityLoading,
-  } = usePolling(fetchAvailability, 30_000);
+  } = usePolling(fetchAvailability, 30_000, "home_availability");
 
   const availabilityMap = useMemo(() => {
     const map = new Map<string, LotAvailability>();
@@ -59,8 +67,8 @@ export default function Home() {
   );
 
   return (
-    <main className="flex-1">
-      <section className="bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-800 py-16 sm:py-24">
+    <main className="flex-1 w-full max-w-full overflow-x-hidden">
+      <section className="bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-800 py-10 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="max-w-3xl">
             <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-teal-100">
@@ -68,39 +76,41 @@ export default function Home() {
                 ? `● ${totalFree} spots available right now`
                 : "Live parking availability"}
             </span>
-            <h1 className="mt-4 text-4xl font-bold leading-tight text-white sm:text-5xl">
+            <h1 className="mt-4 text-3xl font-bold leading-tight text-white sm:text-5xl">
               Find and reserve parking in seconds.
             </h1>
-            <p className="mt-4 text-lg text-teal-100">
+            <p className="mt-3 text-base sm:text-lg text-teal-100">
               See live availability, reserve your spot in advance, and avoid the
               search — at every lot we cover.
             </p>
 
             <form
               onSubmit={(e) => e.preventDefault()}
-              className="mt-8 flex max-w-xl gap-2 rounded-2xl bg-white p-2 shadow-xl"
+              className="mt-6 flex flex-col sm:flex-row max-w-xl gap-2 rounded-2xl bg-white p-2 shadow-xl"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="ml-2 mt-2.5 h-5 w-5 text-slate-400"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by lot name or location…"
-                className="w-full border-0 text-sm text-slate-800 focus:outline-none focus:ring-0"
-              />
+              <div className="flex flex-1 items-center gap-2 px-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="h-5 w-5 shrink-0 text-slate-400"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.35-4.35" />
+                </svg>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by lot name or location…"
+                  className="w-full border-0 text-sm text-slate-800 focus:outline-none focus:ring-0"
+                />
+              </div>
               <button
                 type="submit"
-                className="rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
+                className="rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 shrink-0"
               >
                 Search
               </button>

@@ -46,15 +46,29 @@ if ($LASTEXITCODE -ne 0) { throw "expo export:embed failed" }
 # ── Step 2: Compile to Hermes bytecode ───────────────────────────────────────
 Write-Host "`n[2/3] Compiling bundle to Hermes bytecode..." -ForegroundColor Cyan
 $hbcPath = "$bundlePath.hbc"
-& $hermesc -emit-binary -out $hbcPath $bundlePath 2>&1 | Where-Object { $_ -match "error:" }
-if ($LASTEXITCODE -ne 0) { throw "hermesc compilation failed" }
-Remove-Item $bundlePath
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+  & $hermesc -emit-binary -out $hbcPath $bundlePath
+  if ($LASTEXITCODE -ne 0) { throw "hermesc compilation failed with exit code $LASTEXITCODE" }
+} finally {
+  $ErrorActionPreference = $prevEAP
+}
+Remove-Item $bundlePath -Force
 Rename-Item $hbcPath $bundlePath
 $sizeMB = [math]::Round((Get-Item $bundlePath).Length / 1MB, 2)
 Write-Host "  Bundle: $sizeMB MB (Hermes bytecode)" -ForegroundColor Green
 
 # ── Step 3: Build APK ────────────────────────────────────────────────────────
 Write-Host "`n[3/3] Building APK..." -ForegroundColor Cyan
+
+# Clean stale CMake cache to force regeneration with CMAKE_OBJECT_PATH_MAX=120
+$cxxDir = Join-Path $androidDir "app\.cxx"
+if (Test-Path $cxxDir) {
+  Write-Host "  Clearing stale CMake cache..." -ForegroundColor Yellow
+  Remove-Item -Recurse -Force $cxxDir -ErrorAction SilentlyContinue
+}
+
 Push-Location $androidDir
 try {
   .\gradlew.bat assembleDebug
@@ -62,6 +76,7 @@ try {
 } finally {
   Pop-Location
 }
+
 
 $apkMB = [math]::Round((Get-Item $apkPath).Length / 1MB, 1)
 Write-Host "`n✅ APK ready: $apkPath ($apkMB MB)" -ForegroundColor Green

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { apiGet } from "@/lib/api";
 import { formatCurrency, formatDate, statusBadge } from "@/lib/utils";
-import AdminTabs from "@/components/AdminTabs";
 import PolicyPanel from "@/components/PolicyPanel";
 import type { AdminAnalytics, DailyTrendPoint } from "@/lib/types";
 
@@ -93,18 +92,24 @@ function Donut({ pct, tone }: { pct: number; tone: string }) {
   );
 }
 
+let cachedAnalytics: AdminAnalytics | null = null;
+let cachedAnalyticsTime: string | null = null;
+
 export default function AdminPage() {
-  const [data, setData] = useState<AdminAnalytics | null>(null);
+  const [data, setData] = useState<AdminAnalytics | null>(cachedAnalytics);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedAnalytics);
   const [refresh, setRefresh] = useState(0);
-  const [fetchedAt, setFetchedAt] = useState<string | null>(null);
+  const [fetchedAt, setFetchedAt] = useState<string | null>(cachedAnalyticsTime);
 
   const load = useCallback(() => {
     apiGet<AdminAnalytics>("/api/admin/analytics")
       .then((d) => {
+        cachedAnalytics = d;
+        const now = new Date().toLocaleTimeString();
+        cachedAnalyticsTime = now;
         setData(d);
-        setFetchedAt(new Date().toLocaleTimeString());
+        setFetchedAt(now);
       })
       .catch((e) =>
         setError(e instanceof Error ? e.message : "Failed to load analytics")
@@ -119,7 +124,6 @@ export default function AdminPage() {
   if (loading && !data) {
     return (
       <main className="mx-auto max-w-7xl flex-1 px-4 py-8 sm:px-6">
-        <AdminTabs />
         <div className="space-y-6">
           <div className="h-6 w-56 animate-pulse rounded-lg bg-slate-100" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -198,8 +202,8 @@ export default function AdminPage() {
   ];
 
   return (
-    <main className="mx-auto max-w-7xl flex-1 px-4 py-8 sm:px-6">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <main className="mx-auto w-full max-w-7xl flex-1 px-3 sm:px-6 py-6 sm:py-8 min-w-0">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-slate-800">
@@ -239,8 +243,6 @@ export default function AdminPage() {
           </button>
         </div>
       </div>
-
-      <AdminTabs />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, i) => (

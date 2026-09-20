@@ -22,9 +22,12 @@ export function Card({
 export function Chip({ status }: { status: string }) {
   const c = statusColor(status);
   return (
-    <Text style={[styles.chip, { backgroundColor: c.bg, color: c.text }]}>
-      {STATUS_LABEL[status] ?? status}
-    </Text>
+    <View style={[styles.chipBadge, { backgroundColor: c.bg }]}>
+      {status === 'ACTIVE' && <View style={styles.activeDot} />}
+      <Text style={[styles.chipText, { color: c.text }]}>
+        {STATUS_LABEL[status] ?? status}
+      </Text>
+    </View>
   );
 }
 
@@ -106,14 +109,24 @@ const styles = StyleSheet.create({
     borderColor: C.border,
     padding: 16,
   },
-  chip: {
-    fontSize: 12,
-    fontWeight: '600',
+  chipBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    overflow: 'hidden',
     alignSelf: 'flex-start',
+    gap: 5,
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#059669',
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   btn: {
     borderRadius: 14,

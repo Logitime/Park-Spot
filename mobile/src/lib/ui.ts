@@ -41,23 +41,25 @@ export const STATUS_LABEL: Record<string, string> = {
 export function statusColor(status: string): { bg: string; text: string } {
   switch (status) {
     case 'AVAILABLE':
-      return { bg: '#d1fae5', text: '#047857' };
+      return { bg: '#ecfdf5', text: '#059669' };
     case 'OCCUPIED':
-      return { bg: '#ffe4e6', text: '#be123c' };
+      return { bg: '#fff1f2', text: '#e11d48' };
     case 'RESERVED':
-      return { bg: '#fef3c7', text: '#b45309' };
+      return { bg: '#fffbeb', text: '#d97706' };
     case 'CONFIRMED':
-      return { bg: '#dbeafe', text: '#1d4ed8' };
+      return { bg: '#f0f9ff', text: '#0284c7' };
     case 'ACTIVE':
-      return { bg: '#d1fae5', text: '#047857' };
+      return { bg: '#ecfdf5', text: '#047857' };
     case 'COMPLETED':
-      return { bg: '#f1f5f9', text: '#475569' };
+      return { bg: '#eff6ff', text: '#1d4ed8' };
+    case 'EXPIRED':
+      return { bg: '#fff1f2', text: '#be123c' };
     case 'CANCELLED':
-      return { bg: '#ffe4e6', text: '#be123c' };
+      return { bg: '#f1f5f9', text: '#64748b' };
     case 'PENDING':
-      return { bg: '#fef3c7', text: '#b45309' };
+      return { bg: '#fffbeb', text: '#b45309' };
     case 'PAID':
-      return { bg: '#d1fae5', text: '#047857' };
+      return { bg: '#ecfdf5', text: '#059669' };
     default:
       return { bg: '#f1f5f9', text: '#475569' };
   }

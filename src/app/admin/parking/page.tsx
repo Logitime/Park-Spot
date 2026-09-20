@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiGet } from "@/lib/api";
-import AdminTabs from "@/components/AdminTabs";
 
 type SpotInfo = {
   id: string;
@@ -85,10 +84,13 @@ function Donut({ pct }: { pct: number }) {
   );
 }
 
+let cachedParkingLots: LotInfo[] | null = null;
+let cachedParkingTime: string | null = null;
+
 export default function ParkingStatusPage() {
-  const [lots, setLots] = useState<LotInfo[] | null>(null);
+  const [lots, setLots] = useState<LotInfo[] | null>(cachedParkingLots);
   const [error, setError] = useState<string | null>(null);
-  const [fetchedAt, setFetchedAt] = useState<string | null>(null);
+  const [fetchedAt, setFetchedAt] = useState<string | null>(cachedParkingTime);
   const [refresh, setRefresh] = useState(0);
   const initialized = useRef(false);
 
@@ -96,9 +98,12 @@ export default function ParkingStatusPage() {
     if (typeof document !== "undefined" && document.hidden) return;
     try {
       const data = await apiGet<{ lots: LotInfo[] }>("/api/admin/parking/status");
+      cachedParkingLots = data.lots;
+      const timeStr = new Date().toLocaleTimeString();
+      cachedParkingTime = timeStr;
       setLots(data.lots);
       setError(null);
-      setFetchedAt(new Date().toLocaleTimeString());
+      setFetchedAt(timeStr);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load parking status");
     }
@@ -124,8 +129,8 @@ export default function ParkingStatusPage() {
   const allCount = total ? total.available + total.occupied + total.reserved : 0;
 
   return (
-    <main className="mx-auto max-w-7xl flex-1 px-4 py-8 sm:px-6">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <main className="mx-auto w-full max-w-7xl flex-1 px-3 sm:px-6 py-6 sm:py-8 min-w-0">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-slate-800">
@@ -156,8 +161,6 @@ export default function ParkingStatusPage() {
         </div>
       </div>
 
-      <AdminTabs />
-
       {error && (
         <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">
           {error}
@@ -175,22 +178,22 @@ export default function ParkingStatusPage() {
       {lots && (
         <>
           {allCount > 0 && (
-            <div className="mb-6 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-900/5">
-                <p className="text-xs font-medium text-slate-500">Free</p>
-                <p className="text-2xl font-bold tabular-nums text-emerald-600">
+            <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4">
+              <div className="rounded-xl sm:rounded-2xl bg-white p-3 sm:p-4 text-center sm:text-left shadow-sm ring-1 ring-slate-900/5">
+                <p className="text-[11px] sm:text-xs font-medium text-slate-500">Free</p>
+                <p className="text-lg sm:text-2xl font-bold tabular-nums text-emerald-600">
                   {total?.available}
                 </p>
               </div>
-              <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-900/5">
-                <p className="text-xs font-medium text-slate-500">Occupied</p>
-                <p className="text-2xl font-bold tabular-nums text-rose-600">
+              <div className="rounded-xl sm:rounded-2xl bg-white p-3 sm:p-4 text-center sm:text-left shadow-sm ring-1 ring-slate-900/5">
+                <p className="text-[11px] sm:text-xs font-medium text-slate-500">Occupied</p>
+                <p className="text-lg sm:text-2xl font-bold tabular-nums text-rose-600">
                   {total?.occupied}
                 </p>
               </div>
-              <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-900/5">
-                <p className="text-xs font-medium text-slate-500">Reserved</p>
-                <p className="text-2xl font-bold tabular-nums text-amber-600">
+              <div className="rounded-xl sm:rounded-2xl bg-white p-3 sm:p-4 text-center sm:text-left shadow-sm ring-1 ring-slate-900/5">
+                <p className="text-[11px] sm:text-xs font-medium text-slate-500">Reserved</p>
+                <p className="text-lg sm:text-2xl font-bold tabular-nums text-amber-600">
                   {total?.reserved}
                 </p>
               </div>
@@ -267,7 +270,7 @@ export default function ParkingStatusPage() {
                               <span
                                 key={spot.id}
                                 title={`Spot #${spot.number} · ${spot.status}${tags ? ` · ${tags}` : ""}`}
-                                className={`grid h-9 w-9 place-items-center rounded-lg text-[11px] font-semibold transition hover:scale-105 ${STATUS_TONE[spot.status] ?? "bg-slate-200 text-slate-600"}`}
+                                className={`grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-lg text-[10px] sm:text-[11px] font-semibold transition hover:scale-105 ${STATUS_TONE[spot.status] ?? "bg-slate-200 text-slate-600"}`}
                               >
                                 {spot.number}
                               </span>

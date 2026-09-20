@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export function usePolling<T>(fetcher: () => Promise<T>, intervalMs = 30_000) {
-  const [data, setData] = useState<T | null>(null);
+const memoryCache = new Map<string, unknown>();
+
+export function usePolling<T>(
+  fetcher: () => Promise<T>,
+  intervalMs = 30_000,
+  cacheKey?: string
+) {
+  const cached = cacheKey ? (memoryCache.get(cacheKey) as T | undefined) ?? null : null;
+  const [data, setData] = useState<T | null>(cached);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cached);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const run = useCallback(async () => {
     try {
       const result = await fetcher();
+      if (cacheKey) memoryCache.set(cacheKey, result);
       setData(result);
       setError(null);
     } catch (e) {
@@ -16,7 +24,7 @@ export function usePolling<T>(fetcher: () => Promise<T>, intervalMs = 30_000) {
     } finally {
       setLoading(false);
     }
-  }, [fetcher]);
+  }, [fetcher, cacheKey]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

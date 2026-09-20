@@ -2,13 +2,21 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth";
 
+let cachedPayload: any = null;
+let lastCacheTime = 0;
+const CACHE_TTL_MS = 5000; // 5-second cache for fast navigation
+
 export async function GET() {
   const session = await requireSession().catch(() => null);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (session.role === "USER") {
+  if (session.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (cachedPayload && Date.now() - lastCacheTime < CACHE_TTL_MS) {
+    return NextResponse.json(cachedPayload);
   }
 
   const lots = await prisma.parkingLot.findMany({ select: { id: true, name: true } });
@@ -118,7 +126,7 @@ export async function GET() {
     })
   );
 
-  return NextResponse.json({
+  const payload = {
     summary: {
       totalUsers: users,
       totalReservations,
@@ -137,5 +145,10 @@ export async function GET() {
       amount: r.totalPrice,
       createdAt: r.createdAt,
     })),
-  });
+  };
+
+  cachedPayload = payload;
+  lastCacheTime = Date.now();
+
+  return NextResponse.json(payload);
 }

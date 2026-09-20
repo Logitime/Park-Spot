@@ -23,6 +23,7 @@ import {
   statusColor,
 } from '@/src/lib/ui';
 import { Card } from '@/src/components/ui';
+import { useAuth } from '@/src/lib/auth';
 import type { Lot } from '@/src/lib/types';
 
 function Cap({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
@@ -41,6 +42,7 @@ function Cap({ label, active, onPress }: { label: string; active: boolean; onPre
 
 export default function FindScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [lots, setLots] = useState<Lot[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -134,6 +136,28 @@ export default function FindScreen() {
     () => ({ ...selectedRegion, latitudeDelta: 0.35, longitudeDelta: 0.35 }),
     [selectedRegion]
   );
+
+  if (user?.role === 'OPERATOR') {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.brand}>ParkSpot</Text>
+            <Text style={styles.subtitle}>Operator Mode Active</Text>
+          </View>
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+          <Text style={{ fontSize: 44, marginBottom: 12 }}>🛡️</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: C.text, textAlign: 'center', marginBottom: 8 }}>
+            Operator Account
+          </Text>
+          <Text style={{ color: C.sub, textAlign: 'center', lineHeight: 22 }}>
+            Find parking and bookings are reserved for drivers. Use the Operator portal on the web app to manage parking lots and barrier controls.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

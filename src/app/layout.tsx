@@ -27,10 +27,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className="h-full antialiased">
-      <body className="flex min-h-full flex-col bg-slate-50 font-sans text-slate-900" suppressHydrationWarning>
+    <html lang="en" className="h-full antialiased overflow-x-hidden">
+      <body className="flex min-h-full flex-col bg-slate-50 font-sans text-slate-900 overflow-x-hidden w-full max-w-full" suppressHydrationWarning>
         <Navbar />
-        <div className="flex flex-1 flex-col">{children}</div>
+        <div className="flex flex-1 flex-col w-full max-w-full overflow-x-hidden">{children}</div>
         <footer className="border-t border-slate-200 bg-white py-6">
           <div className="mx-auto max-w-7xl px-4 text-center text-xs text-slate-400 sm:px-6">
             ParkSpot · Car Parking Guidance System · Demo build

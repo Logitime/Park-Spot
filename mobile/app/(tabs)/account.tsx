@@ -154,6 +154,7 @@ export default function AccountScreen() {
           <View style={styles.demo}>
             <Text style={styles.demoTitle}>Demo accounts</Text>
             <Text style={styles.small}>user@parking.com / user123</Text>
+            <Text style={styles.small}>operator@parking.com / operator123</Text>
             <Text style={styles.small}>admin@parking.com / admin123</Text>
           </View>
         </ScrollView>
@@ -188,7 +189,7 @@ function ServerSection({
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
-          placeholder="http://192.168.1.59:4000"
+          placeholder="https://park-spot-fawn.vercel.app"
           placeholderTextColor={C.muted}
           style={styles.input}
         />

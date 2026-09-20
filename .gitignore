@@ -31,6 +31,7 @@ mobile - Copy/
 # misc
 .DS_Store
 *.pem
+*.apk
 
 # debug
 npm-debug.log*
